@@ -62,45 +62,54 @@ if (isFirebaseEnabled) {
   console.warn("StyleVision AI: Firebase credentials missing. Running in Local Demo Mode (using localStorage).");
 }
 
+// Active auth listeners
+const activeAuthListeners: Array<(user: any) => void> = [];
+
 // Authentication Listeners Wrapper
 export const onAuthStateChanged = (authInstance: any, callback: (user: any) => void) => {
+  activeAuthListeners.push(callback);
+  
+  // Trigger immediately with current user state
+  callback(mockCurrentUser);
+
+  let unsubscribeFirebase: any = null;
   if (isFirebaseEnabled && authInstance) {
     try {
-      return firebaseOnAuthStateChanged(authInstance, callback);
+      unsubscribeFirebase = firebaseOnAuthStateChanged(authInstance, (firebaseUser) => {
+        // If there's an actual Firebase user, or if Firebase user is null and we are not in guest mode
+        if (firebaseUser || !mockCurrentUser || !mockCurrentUser.isAnonymous) {
+          mockCurrentUser = firebaseUser;
+          callback(firebaseUser);
+        }
+      });
     } catch (e) {
-      console.error("firebaseOnAuthStateChanged failed, falling back to mock auth:", e);
+      console.error("firebaseOnAuthStateChanged failed:", e);
     }
   }
-  
-  // Register listener for mock auth
-  mockAuthListeners.push(callback);
-  // Trigger immediately with current mock user
-  callback(mockCurrentUser);
+
   return () => {
-    const idx = mockAuthListeners.indexOf(callback);
-    if (idx > -1) mockAuthListeners.splice(idx, 1);
+    const idx = activeAuthListeners.indexOf(callback);
+    if (idx > -1) activeAuthListeners.splice(idx, 1);
+    if (unsubscribeFirebase) unsubscribeFirebase();
   };
 };
 
-const notifyMockAuthChange = (user: any) => {
+const notifyAuthChange = (user: any) => {
   mockCurrentUser = user;
-  mockAuthListeners.forEach(listener => listener(user));
+  activeAuthListeners.forEach(listener => listener(user));
 };
 
-// Mock Login methods
+// Login methods
 export const signInAnonymously = async (authInstance: any) => {
-  if (isFirebaseEnabled) {
-    return await firebaseSignInAnonymously(authInstance);
-  } else {
-    const guestUser = {
-      uid: "guest_user_id",
-      email: "guest@stylevision.ai",
-      displayName: "Guest User",
-      isAnonymous: true
-    };
-    notifyMockAuthChange(guestUser);
-    return { user: guestUser };
-  }
+  // Always use local guest mode (instant login, avoids console config issues)
+  const guestUser = {
+    uid: "guest_user_local",
+    email: "guest@stylevision.ai",
+    displayName: "Guest User",
+    isAnonymous: true
+  };
+  notifyAuthChange(guestUser);
+  return { user: guestUser };
 };
 
 export const loginWithGoogle = async () => {
@@ -128,7 +137,7 @@ export const loginWithGoogle = async () => {
       photoURL: "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&q=80&w=100&h=100",
       isAnonymous: false
     };
-    notifyMockAuthChange(googleUser);
+    notifyAuthChange(googleUser);
     return { user: googleUser };
   }
 };
@@ -158,20 +167,23 @@ export const loginWithApple = async () => {
       displayName: "Apple User",
       isAnonymous: false
     };
-    notifyMockAuthChange(appleUser);
+    notifyAuthChange(appleUser);
     return { user: appleUser };
   }
 };
 
 export const logout = async () => {
   if (isFirebaseEnabled) {
-    if (Capacitor.isNativePlatform()) {
-      await FirebaseAuthentication.signOut();
+    try {
+      if (Capacitor.isNativePlatform()) {
+        await FirebaseAuthentication.signOut();
+      }
+      await signOut(auth);
+    } catch (e) {
+      console.error("Firebase signOut failed:", e);
     }
-    await signOut(auth);
-  } else {
-    notifyMockAuthChange(null);
   }
+  notifyAuthChange(null);
 };
 
 // Storage Helpers (Uploader)
