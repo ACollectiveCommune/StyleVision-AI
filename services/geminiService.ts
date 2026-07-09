@@ -119,11 +119,15 @@ const applyDifferenceMask = async (originalSrc: string, generatedSrc: string, cu
         let currentThreshold = 32;
         let currentFeather = 8;
 
-        // Lips Box (rx = 0.14, ry = 0.06, center = [0.5, 0.66])
-        const distLips = Math.max(Math.abs(nx - 0.5) / 0.14, Math.abs(ny - 0.66) / 0.06);
+        // Tight Lips Box (rx = 0.08, ry = 0.02, center = [0.5, 0.65])
+        // Spans ny from 0.63 to 0.67. This strictly covers only red lip tissue,
+        // leaving the mustache region above (0.55 - 0.62) and chin/goatee below (0.68+) editable.
+        const distLips = Math.max(Math.abs(nx - 0.5) / 0.08, Math.abs(ny - 0.65) / 0.02);
 
-        // Eyebrows/Eyes/Nose Box (rx = 0.22, ry = 0.12, center = [0.5, 0.46])
-        const distFace = Math.max(Math.abs(nx - 0.5) / 0.22, Math.abs(ny - 0.46) / 0.12);
+        // Tight Eyebrows/Eyes/Nose Box (rx = 0.20, ry = 0.10, center = [0.5, 0.44])
+        // Spans ny from 0.34 to 0.54. This covers brows, eyes, and nose base,
+        // leaving the mustache region below (0.55+) editable.
+        const distFace = Math.max(Math.abs(nx - 0.5) / 0.20, Math.abs(ny - 0.44) / 0.10);
 
         if (distFace < 1.0) {
           // Smoothly scale threshold up to 999 at the center of eyes/nose/brows
