@@ -10,6 +10,94 @@ const parseDataUrl = (dataUrl: string) => {
   return { mimeType: matches[1], data: matches[2] };
 };
 
+// Loader helper for canvas blending
+const loadImage = (src: string): Promise<HTMLImageElement> => {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.crossOrigin = "anonymous";
+    img.onload = () => resolve(img);
+    img.onerror = (err) => reject(err);
+    img.src = src;
+  });
+};
+
+// Client-side Pixel-by-Pixel difference restorer
+const applyDifferenceMask = async (originalSrc: string, generatedSrc: string): Promise<string> => {
+  try {
+    const [imgOrig, imgGen] = await Promise.all([
+      loadImage(originalSrc),
+      loadImage(generatedSrc)
+    ]);
+
+    const canvas = document.createElement("canvas");
+    canvas.width = imgOrig.width;
+    canvas.height = imgOrig.height;
+    
+    const ctx = canvas.getContext("2d");
+    if (!ctx) throw new Error("Could not get 2d context for mask blending");
+
+    // Draw original image to extract original pixels
+    ctx.drawImage(imgOrig, 0, 0);
+    const origData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    
+    // Draw generated image to extract edited pixels
+    ctx.drawImage(imgGen, 0, 0, canvas.width, canvas.height);
+    const genData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+
+    const outputData = ctx.createImageData(canvas.width, canvas.height);
+    
+    const len = origData.data.length;
+    const threshold = 40; // Color distance threshold to isolate changes
+    const feather = 15;   // Soft edge transition width
+
+    for (let i = 0; i < len; i += 4) {
+      const r1 = origData.data[i];
+      const g1 = origData.data[i+1];
+      const b1 = origData.data[i+2];
+      const a1 = origData.data[i+3];
+
+      const r2 = genData.data[i];
+      const g2 = genData.data[i+1];
+      const b2 = genData.data[i+2];
+      const a2 = genData.data[i+3];
+
+      // Euclidean color distance
+      const dist = Math.sqrt(
+        (r1 - r2) * (r1 - r2) +
+        (g1 - g2) * (g1 - g2) +
+        (b1 - b2) * (b1 - b2)
+      );
+
+      if (dist < threshold - feather) {
+        // Keep original pixel exactly (for unchanged skin, eyebrows, eyes, background)
+        outputData.data[i] = r1;
+        outputData.data[i+1] = g1;
+        outputData.data[i+2] = b1;
+        outputData.data[i+3] = a1;
+      } else if (dist > threshold + feather) {
+        // Keep generated pixel exactly (for hair/beard additions and alterations)
+        outputData.data[i] = r2;
+        outputData.data[i+1] = g2;
+        outputData.data[i+2] = b2;
+        outputData.data[i+3] = a2;
+      } else {
+        // Linear interpolation for soft blend boundaries
+        const factor = (dist - (threshold - feather)) / (2 * feather);
+        outputData.data[i] = Math.round(r1 * (1 - factor) + r2 * factor);
+        outputData.data[i+1] = Math.round(g1 * (1 - factor) + g2 * factor);
+        outputData.data[i+2] = Math.round(b1 * (1 - factor) + b2 * factor);
+        outputData.data[i+3] = Math.round(a1 * (1 - factor) + a2 * factor);
+      }
+    }
+
+    ctx.putImageData(outputData, 0, 0);
+    return canvas.toDataURL("image/jpeg", 0.95);
+  } catch (err) {
+    console.error("Mask blending failed, falling back to raw generated image:", err);
+    return generatedSrc;
+  }
+};
+
 // Detailed Style Prompt Mappings for 100% Accuracy
 const STYLE_PROMPTS: Record<string, string> = {
   // Male Hair
@@ -206,7 +294,11 @@ export const generateStylePreview = async (
       for (const part of parts) {
         if (part.inlineData && part.inlineData.data) {
           const returnedMime = part.inlineData.mimeType || "image/png";
-          return `data:${returnedMime};base64,${part.inlineData.data}`;
+          const generatedBase64 = `data:${returnedMime};base64,${part.inlineData.data}`;
+          
+          // Apply pixel-by-pixel difference mask to restore original face skin and eyebrows perfectly
+          const blendedBase64 = await applyDifferenceMask(currentState.originalImage, generatedBase64);
+          return blendedBase64;
         }
       }
     }
