@@ -251,19 +251,17 @@ export const PhotoEditor: React.FC<PhotoEditorProps> = ({ appState, onUpdateStat
             type="button"
             onClick={handleGenerate}
             disabled={appState.isProcessing}
-            className={`flex items-center gap-2 px-4 py-2 rounded-full font-bold text-xs uppercase tracking-wider shadow-xl transition-all active:scale-95 border backdrop-blur-md ${
+            className={`w-11 h-11 rounded-full flex items-center justify-center shadow-xl border backdrop-blur-md transition-all active:scale-95 duration-200 ${
                 appState.isProcessing 
-                ? 'bg-black/40 text-white/50 border-white/5 cursor-not-allowed' 
-                : 'bg-indigo-600/90 hover:bg-indigo-500 text-white border-indigo-400/50 shadow-indigo-900/20'
+                ? 'bg-black/40 border-white/5 cursor-not-allowed text-white/40' 
+                : 'bg-gradient-to-tr from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white border-indigo-400/30 shadow-[0_4px_12px_rgba(99,102,241,0.4)]'
             }`}
+            title="Generate styling preview"
         >
             {appState.isProcessing ? (
-                 <span className="animate-pulse">Processing...</span>
+                 <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
             ) : (
-                <>
-                    <Icons.Magic />
-                    <span>Generate</span>
-                </>
+                 <Icons.Magic className="w-4 h-4 text-white drop-shadow-[0_0_6px_rgba(255,255,255,0.4)]" />
             )}
         </button>
       </div>
