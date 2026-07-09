@@ -6,8 +6,8 @@ import { BottomNav } from './components/BottomNav';
 import { LoginView } from './components/LoginView';
 import { FavoritesView } from './components/FavoritesView';
 import { Icons } from './constants';
-import { auth, logout, SavedGeneration } from './services/firebase';
-import { onAuthStateChanged, User } from 'firebase/auth';
+import { auth, logout, onAuthStateChanged, SavedGeneration } from './services/firebase';
+import { User } from 'firebase/auth';
 
 const App: React.FC = () => {
   const [state, setState] = useState<AppState>({
