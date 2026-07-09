@@ -78,60 +78,69 @@ export const generateStylePreview = async (
   
   const promptParts: string[] = [];
 
-  // --- 1. Base Instruction ---
-  promptParts.push(`Task: Edit the photo of the person. ID: ${Date.now()}`);
-  
-  // --- 2. Hair Style Logic ---
-  if (!selectedHairStyle || selectedHairStyle.id === 'original') {
-    promptParts.push("CONSTRAINT: Keep the original hairstyle exactly as it is. Do NOT change the hair length or shape.");
-  } else if (selectedHairStyle.id === 'none') {
-    promptParts.push("CONSTRAINT: Keep the original hairstyle.");
+  // --- 1. Base Task ---
+  promptParts.push("Modify the hairstyle and/or facial hair of the subject in the photo according to these specific requests:");
+
+  // --- 2. Hair Style & Color Integration ---
+  const isHairStyleOriginal = !selectedHairStyle || selectedHairStyle.id === 'original';
+  const isHairColorOriginal = !selectedHairColor || selectedHairColor.id === 'original';
+
+  if (isHairStyleOriginal && isHairColorOriginal) {
+    promptParts.push("- Hairstyle & Color: Preserve the original hair structure, length, volume, and color exactly as they are.");
+  } else if (!isHairStyleOriginal && isHairColorOriginal) {
+    const styleDesc = STYLE_PROMPTS[selectedHairStyle.id] || selectedHairStyle.label;
+    promptParts.push(`- Hairstyle: Change the style to a ${styleDesc}. Preserve the original natural hair color.`);
+  } else if (isHairStyleOriginal && !isHairColorOriginal) {
+    const colorDesc = COLOR_PROMPTS[selectedHairColor.id] || selectedHairColor.label;
+    promptParts.push(`- Hair Color: Keep the original hairstyle, but dye the hair to a ${colorDesc} color.`);
   } else {
-    const desc = STYLE_PROMPTS[selectedHairStyle.id] || selectedHairStyle.label;
-    promptParts.push(`ACTION: Change the hairstyle to ${desc}. Replace the existing hair completely. Make the change drastic and visible.`);
+    const styleDesc = STYLE_PROMPTS[selectedHairStyle.id] || selectedHairStyle.label;
+    const colorDesc = COLOR_PROMPTS[selectedHairColor.id] || selectedHairColor.label;
+    promptParts.push(`- Hairstyle & Color: Replace the hair with a ${styleDesc} in a ${colorDesc} color.`);
   }
 
-  // --- 3. Hair Color Logic ---
-  if (!selectedHairColor || selectedHairColor.id === 'original') {
-    promptParts.push("CONSTRAINT: Keep the original hair color.");
-  } else {
-    const desc = COLOR_PROMPTS[selectedHairColor.id] || selectedHairColor.label;
-    promptParts.push(`ACTION: Change the hair color to ${desc}. Do not change the beard color.`);
-  }
-
-  // --- 4. Beard Logic (Male Only) ---
+  // --- 3. Beard Style & Color Integration (Male Only) ---
   if (gender === Gender.MALE) {
-    if (!selectedBeardStyle || selectedBeardStyle.id === 'original') {
-         promptParts.push("CONSTRAINT: Keep the original beard (or lack of beard) exactly as it is.");
-    } else if (selectedBeardStyle.id === 'none') {
-         promptParts.push("ACTION: Remove any beard completely (clean shaven).");
-    } else {
-         const desc = STYLE_PROMPTS[selectedBeardStyle.id] || selectedBeardStyle.label;
-         promptParts.push(`ACTION: Change the beard style to ${desc}.`);
-    }
+    const isBeardStyleOriginal = !selectedBeardStyle || selectedBeardStyle.id === 'original';
+    const isBeardColorOriginal = !selectedBeardColor || selectedBeardColor.id === 'original';
 
-    if (!selectedBeardColor || selectedBeardColor.id === 'original') {
-         promptParts.push("CONSTRAINT: Keep the original beard color.");
+    if (isBeardStyleOriginal && isBeardColorOriginal) {
+      promptParts.push("- Beard: Preserve the original facial hair exactly as it is.");
+    } else if (selectedBeardStyle?.id === 'none') {
+      promptParts.push("- Beard: Remove any beard or mustache completely, leaving a clean-shaven face.");
     } else {
-         if (selectedBeardColor.id === 'match') {
-              promptParts.push("ACTION: Match the beard color to the hair color.");
-         } else {
-              const desc = COLOR_PROMPTS[selectedBeardColor.id] || selectedBeardColor.label;
-              promptParts.push(`ACTION: Change the beard color to ${desc}. Do not change the hair color.`);
-         }
+      let beardDesc = "";
+      if (!isBeardStyleOriginal) {
+        beardDesc = STYLE_PROMPTS[selectedBeardStyle.id] || selectedBeardStyle.label;
+      }
+      
+      let colorDesc = "";
+      if (!isBeardColorOriginal) {
+        if (selectedBeardColor.id === 'match') {
+          colorDesc = isHairColorOriginal ? "matching the original hair color" : `matching the new ${COLOR_PROMPTS[selectedHairColor.id]} hair color`;
+        } else {
+          colorDesc = COLOR_PROMPTS[selectedBeardColor.id] || selectedBeardColor.label;
+        }
+      }
+
+      if (beardDesc && colorDesc) {
+        promptParts.push(`- Beard: Change the facial hair to a ${beardDesc} in a ${colorDesc} color.`);
+      } else if (beardDesc) {
+        promptParts.push(`- Beard: Change the facial hair style to a ${beardDesc}. Keep the original beard color.`);
+      } else if (colorDesc) {
+        promptParts.push(`- Beard: Keep the original beard shape, but change its color to ${colorDesc}.`);
+      }
     }
   } else {
-    promptParts.push("CONSTRAINT: Ensure face is clean shaven (no beard).");
+    // Female
+    promptParts.push("- Facial Hair: The face must remain clean-shaven (no beard or mustache).");
   }
 
-  // --- 5. Strict Separation & Preservation ---
+  // --- 4. Extra Prompt Rules ---
   promptParts.push(`
     CRITICAL RULES:
-    1. INDEPENDENCE: Changes to hair must NOT affect beard. Changes to beard must NOT affect hair.
-    2. PRESERVATION: Do NOT change facial features (eyes, nose, mouth, jawline, ears). Do NOT change background, clothing, or lighting.
-    3. REALISM: The result must be a photorealistic photograph, not a drawing.
-    4. If a feature is marked "Keep original", do not modify it.
-    5. Ignore the previous hairstyle completely when applying a new one.
+    1. Only modify the hair and facial hair regions. 
+    2. Do NOT change the shape, color, or style of anything else.
   `);
 
   const prompt = promptParts.join("\n");
@@ -162,6 +171,19 @@ export const generateStylePreview = async (
           },
         ],
       },
+      systemInstruction: {
+        parts: [
+          {
+            text: `You are a high-fidelity virtual barbershop and hair try-on editor. 
+            
+            YOUR ABSOLUTE TOP PRIORITY IS IDENTITY PRESERVATION:
+            - The person's facial structure, identity, age, expression, eyes, nose, mouth, cheeks, chin, jawline, ears, skin texture, and wrinkles MUST remain 100% identical to the input image.
+            - The background, clothing, lighting, shadows, camera angle, and overall image composition MUST NOT change at all.
+            - You are ONLY permitted to modify the pixels representing the hair on the head and the facial hair (beard, mustache). 
+            - The newly edited hair and beard must blend realistically into the natural hairline and face boundary, maintaining high photorealism.`
+          }
+        ]
+      }
     };
 
     const response = await fetch(url, {
@@ -174,7 +196,7 @@ export const generateStylePreview = async (
 
     if (!response.ok) {
       const errText = await response.text();
-      console.error("Gemini API direct error response:", errText);
+      console.error("Gemini API error:", errText);
       throw new Error(`Gemini API returned status ${response.status}`);
     }
 
