@@ -30,11 +30,22 @@ const App: React.FC = () => {
 
   // Monitor auth state changes
   useEffect(() => {
+    // Safety timeout: if auth state doesn't resolve in 1500ms, force proceed (fallback to guest/login)
+    const safetyTimeout = setTimeout(() => {
+      console.warn("Firebase Auth listener timed out. Bypassing loading screen.");
+      setAuthChecked(true);
+    }, 1500);
+
     const unsubscribe = onAuthStateChanged(auth, (user) => {
+      clearTimeout(safetyTimeout);
       setCurrentUser(user);
       setAuthChecked(true);
     });
-    return () => unsubscribe();
+
+    return () => {
+      clearTimeout(safetyTimeout);
+      if (unsubscribe) unsubscribe();
+    };
   }, []);
 
   // Helper to update state

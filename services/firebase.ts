@@ -64,18 +64,22 @@ if (isFirebaseEnabled) {
 
 // Authentication Listeners Wrapper
 export const onAuthStateChanged = (authInstance: any, callback: (user: any) => void) => {
-  if (isFirebaseEnabled) {
-    return firebaseOnAuthStateChanged(authInstance, callback);
-  } else {
-    // Register listener for mock auth
-    mockAuthListeners.push(callback);
-    // Trigger immediately with current mock user
-    callback(mockCurrentUser);
-    return () => {
-      const idx = mockAuthListeners.indexOf(callback);
-      if (idx > -1) mockAuthListeners.splice(idx, 1);
-    };
+  if (isFirebaseEnabled && authInstance) {
+    try {
+      return firebaseOnAuthStateChanged(authInstance, callback);
+    } catch (e) {
+      console.error("firebaseOnAuthStateChanged failed, falling back to mock auth:", e);
+    }
   }
+  
+  // Register listener for mock auth
+  mockAuthListeners.push(callback);
+  // Trigger immediately with current mock user
+  callback(mockCurrentUser);
+  return () => {
+    const idx = mockAuthListeners.indexOf(callback);
+    if (idx > -1) mockAuthListeners.splice(idx, 1);
+  };
 };
 
 const notifyMockAuthChange = (user: any) => {
