@@ -112,6 +112,28 @@ const applyDifferenceMask = async (originalSrc: string, generatedSrc: string): P
           finalA = Math.round(a1 * (1 - factor) + a2 * factor);
         }
 
+        // --- Central Face Eye-Nose Exclusion Zone ---
+        // This column spans the horizontal middle of the face where no beard grows.
+        // We force it to remain 100% original to eliminate any AI-generated nostril shifts,
+        // lip boundaries, or lighting mismatch residues around the nose and eyes.
+        let excludeFactor = 0;
+        if (x >= w * 0.30 && x <= w * 0.70) {
+          if (y < h * 0.54) {
+            // Upper face center: 100% original (eyes, nose bridge, eyebrows, forehead)
+            excludeFactor = 1.0;
+          } else if (y >= h * 0.54 && y <= h * 0.59) {
+            // Soft vertical blend transition right between the nostrils/nose base and the upper lip/mustache
+            excludeFactor = (h * 0.59 - y) / (h * 0.59 - h * 0.54);
+          }
+        }
+
+        if (excludeFactor > 0) {
+          finalR = Math.round(finalR * (1 - excludeFactor) + r1 * excludeFactor);
+          finalG = Math.round(finalG * (1 - excludeFactor) + g1 * excludeFactor);
+          finalB = Math.round(finalB * (1 - excludeFactor) + b1 * excludeFactor);
+          finalA = Math.round(finalA * (1 - excludeFactor) + a1 * excludeFactor);
+        }
+
         if (ellipseDistance > 0.85) {
           // Boundary of the face ellipse: Blend smoothly with the fully generated region
           const spatialFactor = (ellipseDistance - 0.85) / 0.40; // 0 at 0.85, 1 at 1.25
