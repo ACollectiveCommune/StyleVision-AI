@@ -46,7 +46,7 @@ export const PhotoEditor: React.FC<PhotoEditorProps> = ({ appState, onUpdateStat
         onUpdateState({ currentImage: newImage, isProcessing: false });
         
         // Auto-save styling prediction to Firestore
-        const user = auth.currentUser;
+        const user = auth?.currentUser;
         if (user && appState.originalImage) {
           setIsSaving(true);
           try {
@@ -86,7 +86,7 @@ export const PhotoEditor: React.FC<PhotoEditorProps> = ({ appState, onUpdateStat
 
   // Toggle favorite helper
   const handleToggleFavorite = async () => {
-    const user = auth.currentUser;
+    const user = auth?.currentUser;
     if (!user || !currentDocId || isSaving) return;
     try {
       const nextState = !isFavorited;
