@@ -46,6 +46,7 @@ export const PhotoEditor: React.FC<PhotoEditorProps> = ({ appState, onUpdateStat
   const [showOriginal, setShowOriginal] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [isControlsVisible, setIsControlsVisible] = useState(true);
+  const [activeTab, setActiveTab] = useState<'hair' | 'beard'>('hair');
 
   // Firestore sync state
   const [currentDocId, setCurrentDocId] = useState<string | null>(null);
@@ -68,6 +69,7 @@ export const PhotoEditor: React.FC<PhotoEditorProps> = ({ appState, onUpdateStat
     
     const requestId = ++latestRequestId.current;
     onUpdateState({ isProcessing: true });
+    setIsControlsVisible(false); // Auto-hide controls when generating
     setErrorMsg(null);
     setCurrentDocId(null);
     setIsFavorited(false);
@@ -77,6 +79,7 @@ export const PhotoEditor: React.FC<PhotoEditorProps> = ({ appState, onUpdateStat
       
       if (requestId === latestRequestId.current) {
         onUpdateState({ currentImage: newImage, isProcessing: false });
+        setIsControlsVisible(true); // Restore controls on success
         
         // Auto-save styling prediction to Firestore
         const user = auth?.currentUser;
@@ -121,6 +124,7 @@ export const PhotoEditor: React.FC<PhotoEditorProps> = ({ appState, onUpdateStat
         console.error(err);
         setErrorMsg("Could not apply style. Please try again.");
         onUpdateState({ isProcessing: false });
+        setIsControlsVisible(true); // Restore controls on error
       }
     }
   }, [appState, onUpdateState]);
@@ -266,51 +270,80 @@ export const PhotoEditor: React.FC<PhotoEditorProps> = ({ appState, onUpdateStat
 
       {/* 4. Editor Controls Overlay (Bottom) */}
       {isControlsVisible ? (
-        <div className="absolute bottom-24 left-0 right-0 z-40 flex flex-col gap-0 pb-2 pt-2 rounded-t-3xl bg-black/60 backdrop-blur-2xl border-t border-white/10 animate-in slide-in-from-bottom duration-300 pointer-events-auto">
+        <div className="absolute bottom-24 left-0 right-0 z-40 flex flex-col gap-0 pb-3 pt-1 rounded-t-3xl bg-black/60 backdrop-blur-2xl border-t border-white/10 animate-in slide-in-from-bottom duration-300 pointer-events-auto">
           
-          {/* Hair Header */}
-          <div className="flex items-center px-4 mb-1 mt-1">
-            <span className="text-[10px] font-bold text-white/70 uppercase tracking-widest mr-2">Hair</span>
-            <div className="h-px bg-white/10 flex-grow"></div>
+          {/* Top Collapse Handle */}
+          <div className="flex justify-center items-center h-5 cursor-pointer group" onClick={() => setIsControlsVisible(false)}>
+            <div className="w-12 h-1 bg-white/20 rounded-full group-hover:bg-white/40 transition-colors"></div>
           </div>
 
-          {/* Hair Section */}
-          <div className="w-full">
-            {/* Hair Styles Row */}
-            <div className="flex overflow-x-auto no-scrollbar pl-4 pr-4 space-x-2 items-center mb-0.5">
-              {hairStyles.map(s => (
-                 <StyleButton 
-                   key={s.id} 
-                   item={s} 
-                   isSelected={appState.selectedHairStyle?.id === s.id} 
-                   onClick={() => handleSelectStyle(s)} 
-                 />
-              ))}
+          {/* Tab Selection (only for Males, as Females don't have Beard category) */}
+          {appState.gender === Gender.MALE ? (
+            <div className="flex justify-center border-b border-white/5 px-4 mb-2">
+              <button
+                type="button"
+                onClick={() => setActiveTab('hair')}
+                className={`px-8 py-2 text-[10px] font-extrabold uppercase tracking-widest border-b-2 transition-all ${
+                  activeTab === 'hair' 
+                    ? 'text-white border-white' 
+                    : 'text-white/40 border-transparent hover:text-white/60'
+                }`}
+              >
+                Hair Options
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveTab('beard')}
+                className={`px-8 py-2 text-[10px] font-extrabold uppercase tracking-widest border-b-2 transition-all ${
+                  activeTab === 'beard' 
+                    ? 'text-white border-white' 
+                    : 'text-white/40 border-transparent hover:text-white/60'
+                }`}
+              >
+                Beard Options
+              </button>
             </div>
-
-            {/* Hair Colors Row */}
-            <div className="flex overflow-x-auto no-scrollbar pl-4 pr-4 space-x-2 items-center h-8 mb-1">
-              {HAIR_COLORS.map(c => (
-                <ColorButton
-                  key={c.id}
-                  item={c}
-                  isSelected={appState.selectedHairColor?.id === c.id}
-                  onClick={() => handleSelectStyle(c)}
-                />
-              ))}
+          ) : (
+            /* Simple Hair Header for females */
+            <div className="flex items-center px-4 mb-2 mt-1">
+              <span className="text-[10px] font-bold text-white/70 uppercase tracking-widest mr-2">Hair Options</span>
+              <div className="h-px bg-white/10 flex-grow"></div>
             </div>
-          </div>
+          )}
 
-          {/* Beard Section (Male only) */}
-          {appState.gender === Gender.MALE && (
-            <div className="w-full mt-0.5">
-              <div className="flex items-center px-4 mb-0.5">
-                <span className="text-[10px] font-bold text-white/70 uppercase tracking-widest mr-2">Beard</span>
-                <div className="h-px bg-white/10 flex-grow"></div>
+          {/* Active Tab Panel */}
+          {activeTab === 'hair' || appState.gender !== Gender.MALE ? (
+            /* Hair Tab Panel */
+            <div className="w-full animate-in fade-in duration-200">
+              {/* Hair Styles Row */}
+              <div className="flex overflow-x-auto no-scrollbar pl-4 pr-4 space-x-2 items-center mb-1">
+                {hairStyles.map(s => (
+                   <StyleButton 
+                     key={s.id} 
+                     item={s} 
+                     isSelected={appState.selectedHairStyle?.id === s.id} 
+                     onClick={() => handleSelectStyle(s)} 
+                   />
+                ))}
               </div>
-              
-               {/* Beard Styles Row */}
-              <div className="flex overflow-x-auto no-scrollbar pl-4 pr-4 space-x-2 items-center mb-0.5">
+
+              {/* Hair Colors Row */}
+              <div className="flex overflow-x-auto no-scrollbar pl-4 pr-4 space-x-2 items-center h-8">
+                {HAIR_COLORS.map(c => (
+                  <ColorButton
+                    key={c.id}
+                    item={c}
+                    isSelected={appState.selectedHairColor?.id === c.id}
+                    onClick={() => handleSelectStyle(c)}
+                  />
+                ))}
+              </div>
+            </div>
+          ) : (
+            /* Beard Tab Panel */
+            <div className="w-full animate-in fade-in duration-200">
+              {/* Beard Styles Row */}
+              <div className="flex overflow-x-auto no-scrollbar pl-4 pr-4 space-x-2 items-center mb-1">
                 {beardOptions.map(b => (
                   <StyleButton 
                     key={b.id} 
@@ -321,15 +354,15 @@ export const PhotoEditor: React.FC<PhotoEditorProps> = ({ appState, onUpdateStat
                 ))}
               </div>
 
-               {/* Beard Colors Row */}
-               <div className="flex overflow-x-auto no-scrollbar pl-4 pr-4 space-x-2 items-center h-8">
+              {/* Beard Colors Row */}
+              <div className="flex overflow-x-auto no-scrollbar pl-4 pr-4 space-x-2 items-center h-8">
                 {BEARD_COLORS.map(c => (
                    <ColorButton
-                   key={c.id}
-                   item={c}
-                   isSelected={appState.selectedBeardColor?.id === c.id}
-                   onClick={() => handleSelectStyle(c)}
-                 />
+                     key={c.id}
+                     item={c}
+                     isSelected={appState.selectedBeardColor?.id === c.id}
+                     onClick={() => handleSelectStyle(c)}
+                   />
                 ))}
               </div>
             </div>
