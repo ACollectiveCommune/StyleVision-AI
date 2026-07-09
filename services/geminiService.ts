@@ -10,44 +10,44 @@ const parseDataUrl = (dataUrl: string) => {
   return { mimeType: matches[1], data: matches[2] };
 };
 
-// Detailed Style Prompt Mappings for Accuracy
+// Detailed Style Prompt Mappings for 100% Accuracy
 const STYLE_PROMPTS: Record<string, string> = {
   // Male Hair
-  bald: "completely bald head (smooth shaved)",
-  buzz: "short military buzz cut",
-  crew: "classic crew cut with short tapered sides",
-  undercut: "disconnected undercut hairstyle (shaved sides, long top)",
-  fade: "high skin fade haircut",
-  pompadour: "classic voluminous pompadour hairstyle",
-  quiff: "modern quiff hairstyle with volume at the front",
-  slick: "slicked back hair using pomade",
-  sidepart: "classic gentleman's side part hairstyle",
-  curlytop: "short sides with a thick curly textured top",
-  dreads: "medium length dreadlocks",
-  manbun: "man bun with hair tied back",
-  surfer: "long wavy surfer style hair",
+  bald: "completely bald head, shaved smooth to the skin",
+  buzz: "short military buzz cut close to the scalp",
+  crew: "classic crew cut with short tapered sides and slightly longer hair on top",
+  undercut: "undercut haircut with shaved sides and back, and longer styled hair swept back on top",
+  fade: "high skin fade haircut, where the hair tapers down to bare skin on the sides and back",
+  pompadour: "classic voluminous pompadour hairstyle, swept upwards and backwards from the forehead",
+  quiff: "modern quiff hairstyle with height and volume at the front hairline",
+  slick: "slicked-back hairstyle, combed flat and straight back using pomade",
+  sidepart: "classic gentleman's side-parted hairstyle, split on one side and combed neatly",
+  curlytop: "curly top haircut with short sides and thick, textured curly hair on top",
+  dreads: "medium-length dreadlock locs hanging down",
+  manbun: "man bun hairstyle, with hair pulled back and tied into a bun at the crown",
+  surfer: "long wavy surfer style hair, falling naturally down to the shoulders",
   
   // Female Hair
-  pixie: "short modern pixie cut",
-  bob: "classic chin-length bob cut",
-  lob: "long bob (lob) hairstyle",
-  shoulder: "shoulder-length hair",
-  longstraight: "long straight sleek hair",
-  longwavy: "long wavy beach hair",
-  curly: "voluminous curly hairstyle with defined ringlets and strong texture",
-  bangs: "hairstyle with bangs (fringe) covering the forehead",
-  braids: "braided hairstyle",
-  updo: "elegant updo (hair tied up)",
+  pixie: "short pixie haircut with textured layers and short sides",
+  bob: "straight, chin-length bob haircut, cut evenly all around",
+  lob: "long bob (lob) haircut, resting just above the shoulders",
+  shoulder: "shoulder-length hair with soft layers",
+  longstraight: "long, straight, sleek hair falling down past the shoulders",
+  longwavy: "long, wavy hair with loose beach waves falling past the shoulders",
+  curly: "voluminous curly hairstyle with defined curls, ringlets, and thick texture",
+  bangs: "straight hair with flat bangs (fringe) covering the forehead",
+  braids: "hair styled into long, neat braids",
+  updo: "elegant updo hairstyle, with hair swept up and pinned neatly in a bun",
 
   // Beard
-  stubble: "light 3-day stubble beard",
-  mustache: "thick mustache (no chin beard)",
-  goatee: "goatee beard",
-  chinstrap: "thin chin strap beard along the jawline",
-  short: "short, neatly trimmed full beard",
-  medium: "medium-length full beard",
-  long: "long, bushy full beard (lumberjack style)",
-  full: "thick full beard",
+  stubble: "light 3-day stubble facial hair along the jawline, chin, and upper lip",
+  mustache: "thick classic mustache on the upper lip, with completely clean-shaven cheeks, jaw, and chin (absolutely no beard)",
+  goatee: "a classic goatee beard consisting of hair only on the chin and a mustache forming a circle around the mouth, with completely clean-shaven cheeks and jawline (no hair on the sides of the face)",
+  chinstrap: "thin chinstrap beard running along the jawline from ear to ear, with clean-shaven cheeks and neck",
+  short: "short, neatly trimmed full beard including mustache, cheeks, and chin",
+  medium: "medium-length full beard covering the cheeks, chin, and mustache",
+  long: "long, full bushy beard (lumberjack style) covering the chin, cheeks, and mustache",
+  full: "thick full beard covering the cheeks, chin, and mustache",
 };
 
 // Detailed Color Prompt Mappings
@@ -78,70 +78,54 @@ export const generateStylePreview = async (
   
   const promptParts: string[] = [];
 
-  // --- 1. Base Task ---
-  promptParts.push("Modify the hairstyle and/or facial hair of the subject in the photo according to these specific requests:");
+  promptParts.push("Modify the hair and facial hair in this photo according to the following specifications:");
 
-  // --- 2. Hair Style & Color Integration ---
+  // --- 1. HAIRSTYLE ---
   const isHairStyleOriginal = !selectedHairStyle || selectedHairStyle.id === 'original';
-  const isHairColorOriginal = !selectedHairColor || selectedHairColor.id === 'original';
-
-  if (isHairStyleOriginal && isHairColorOriginal) {
-    promptParts.push("- Hairstyle & Color: Preserve the original hair structure, length, volume, and color exactly as they are.");
-  } else if (!isHairStyleOriginal && isHairColorOriginal) {
-    const styleDesc = STYLE_PROMPTS[selectedHairStyle.id] || selectedHairStyle.label;
-    promptParts.push(`- Hairstyle: Change the style to a ${styleDesc}. Preserve the original natural hair color.`);
-  } else if (isHairStyleOriginal && !isHairColorOriginal) {
-    const colorDesc = COLOR_PROMPTS[selectedHairColor.id] || selectedHairColor.label;
-    promptParts.push(`- Hair Color: Keep the original hairstyle, but dye the hair to a ${colorDesc} color.`);
+  if (isHairStyleOriginal) {
+    promptParts.push("- HAIRSTYLE: Do not change the hairstyle. Keep the hair length, shape, and cut exactly as it is in the original photo.");
   } else {
     const styleDesc = STYLE_PROMPTS[selectedHairStyle.id] || selectedHairStyle.label;
-    const colorDesc = COLOR_PROMPTS[selectedHairColor.id] || selectedHairColor.label;
-    promptParts.push(`- Hairstyle & Color: Replace the hair with a ${styleDesc} in a ${colorDesc} color.`);
+    promptParts.push(`- HAIRSTYLE: Replace the current hair with a ${styleDesc}.`);
   }
 
-  // --- 3. Beard Style & Color Integration (Male Only) ---
+  // --- 2. HAIR COLOR ---
+  const isHairColorOriginal = !selectedHairColor || selectedHairColor.id === 'original';
+  if (isHairColorOriginal) {
+    promptParts.push("- HAIR COLOR: Do not change the hair color. Keep the original hair color exactly as it is.");
+  } else {
+    const colorDesc = COLOR_PROMPTS[selectedHairColor.id] || selectedHairColor.label;
+    promptParts.push(`- HAIR COLOR: Dye the hair on the head to a ${colorDesc} color. Ensure all hair strands are evenly dyed to this color.`);
+  }
+
+  // --- 3. FACIAL HAIR (BEARD / MUSTACHE) ---
   if (gender === Gender.MALE) {
+    // Beard Style
     const isBeardStyleOriginal = !selectedBeardStyle || selectedBeardStyle.id === 'original';
-    const isBeardColorOriginal = !selectedBeardColor || selectedBeardColor.id === 'original';
-
-    if (isBeardStyleOriginal && isBeardColorOriginal) {
-      promptParts.push("- Beard: Preserve the original facial hair exactly as it is.");
-    } else if (selectedBeardStyle?.id === 'none') {
-      promptParts.push("- Beard: Remove any beard or mustache completely, leaving a clean-shaven face.");
+    if (isBeardStyleOriginal) {
+      promptParts.push("- BEARD STYLE: Do not change the beard style. Keep the original facial hair shape, density, or lack of facial hair exactly as it is.");
+    } else if (selectedBeardStyle.id === 'none') {
+      promptParts.push("- BEARD STYLE: Remove all facial hair completely. The subject must be clean-shaven (no mustache, no goatee, no beard, no stubble).");
     } else {
-      let beardDesc = "";
-      if (!isBeardStyleOriginal) {
-        beardDesc = STYLE_PROMPTS[selectedBeardStyle.id] || selectedBeardStyle.label;
-      }
-      
-      let colorDesc = "";
-      if (!isBeardColorOriginal) {
-        if (selectedBeardColor.id === 'match') {
-          colorDesc = isHairColorOriginal ? "matching the original hair color" : `matching the new ${COLOR_PROMPTS[selectedHairColor.id]} hair color`;
-        } else {
-          colorDesc = COLOR_PROMPTS[selectedBeardColor.id] || selectedBeardColor.label;
-        }
-      }
+      const styleDesc = STYLE_PROMPTS[selectedBeardStyle.id] || selectedBeardStyle.label;
+      promptParts.push(`- BEARD STYLE: Apply a ${styleDesc}. Remove any other facial hair that does not belong to this style.`);
+    }
 
-      if (beardDesc && colorDesc) {
-        promptParts.push(`- Beard: Change the facial hair to a ${beardDesc} in a ${colorDesc} color.`);
-      } else if (beardDesc) {
-        promptParts.push(`- Beard: Change the facial hair style to a ${beardDesc}. Keep the original beard color.`);
-      } else if (colorDesc) {
-        promptParts.push(`- Beard: Keep the original beard shape, but change its color to ${colorDesc}.`);
-      }
+    // Beard Color
+    const isBeardColorOriginal = !selectedBeardColor || selectedBeardColor.id === 'original';
+    if (isBeardColorOriginal) {
+      promptParts.push("- BEARD COLOR: Do not change the facial hair color. Keep the original mustache and beard color exactly as it is.");
+    } else if (selectedBeardColor.id === 'match') {
+      const targetColor = isHairColorOriginal ? "the original hair color" : `${COLOR_PROMPTS[selectedHairColor.id]} (matching the new hair color)`;
+      promptParts.push(`- BEARD COLOR: Dye the mustache and beard hair to ${targetColor}.`);
+    } else {
+      const colorDesc = COLOR_PROMPTS[selectedBeardColor.id] || selectedBeardColor.label;
+      promptParts.push(`- BEARD COLOR: Dye the mustache and beard hair to a ${colorDesc} color. Ensure all facial hair matches this exact color.`);
     }
   } else {
     // Female
-    promptParts.push("- Facial Hair: The face must remain clean-shaven (no beard or mustache).");
+    promptParts.push("- FACIAL HAIR: The face must remain completely clean-shaven with absolutely no mustache, stubble, or beard.");
   }
-
-  // --- 4. Extra Prompt Rules ---
-  promptParts.push(`
-    CRITICAL RULES:
-    1. Only modify the hair and facial hair regions. 
-    2. Do NOT change the shape, color, or style of anything else.
-  `);
 
   const prompt = promptParts.join("\n");
 
@@ -174,13 +158,17 @@ export const generateStylePreview = async (
       systemInstruction: {
         parts: [
           {
-            text: `You are a high-fidelity virtual barbershop and hair try-on editor. 
+            text: `You are a high-fidelity virtual try-on hair stylist and barber. 
             
-            YOUR ABSOLUTE TOP PRIORITY IS IDENTITY PRESERVATION:
-            - The person's facial structure, identity, age, expression, eyes, nose, mouth, cheeks, chin, jawline, ears, skin texture, and wrinkles MUST remain 100% identical to the input image.
-            - The background, clothing, lighting, shadows, camera angle, and overall image composition MUST NOT change at all.
-            - You are ONLY permitted to modify the pixels representing the hair on the head and the facial hair (beard, mustache). 
-            - The newly edited hair and beard must blend realistically into the natural hairline and face boundary, maintaining high photorealism.`
+            YOUR TARGET MANDATE:
+            - Accurately apply the requested style and color changes to the hair and beard.
+            - If a style or color is marked "Do not change" or "Keep original", you must leave that specific feature untouched.
+            - Ensure the colors selected for hair and beard match the prompt exactly (e.g. if blonde is selected, hair must be dyed golden blonde).
+            
+            IDENTITY & FACE PROTECTION RULES:
+            - The person's face structure, identity, eyes, nose, lips, jawline, skin tone, skin pores, expression, and shape of the skull must remain 100% IDENTICAL to the input photo.
+            - The background, clothing, camera angle, lighting, and ambient shadows must not change.
+            - Only modify pixels within the hair-on-head region and the facial hair region.`
           }
         ]
       }
