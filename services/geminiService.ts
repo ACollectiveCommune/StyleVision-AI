@@ -127,6 +127,15 @@ export const generateStylePreview = async (
     promptParts.push("- FACIAL HAIR: The face must remain completely clean-shaven with absolutely no mustache, stubble, or beard.");
   }
 
+  // --- 4. STRICT PRESERVATION IN USER PROMPT ---
+  promptParts.push(`
+    CRITICAL QUALITY CONTROL RULES:
+    1. Only modify the hair and facial hair regions. 
+    2. Do NOT change the shape, color, or style of anything else.
+    3. Do NOT smooth, blur, soften, or airbrush the skin. Keep all natural skin texture, visible pores, freckles, and natural skin details exactly as in the original image.
+    4. Keep the eyebrows 100% identical to the original image in shape, thickness, position, and color.
+  `);
+
   const prompt = promptParts.join("\n");
 
   try {
@@ -168,6 +177,7 @@ export const generateStylePreview = async (
             IDENTITY, FACE, & SKIN PROTECTION RULES:
             - The person's face structure, eyes, nose, lips, jawline, ears, head shape, and overall identity must remain 100% identical to the input photo.
             - STRICT SKIN TEXTURE PRESERVATION: Do NOT smooth, blur, soften, filter, or airbrush the skin. The skin texture must remain completely natural, showing the original pores, freckles, wrinkles, facial lines, grain, skin tone, and details exactly as they are in the original image. Avoid any 'beautified', 'plastic', or 'airbrushed' look on the skin.
+            - STRICT EYEBROW PRESERVATION: Do NOT modify the eyebrows. The shape, thickness, arches, density, color, and placement of the eyebrows must remain exactly identical to the input image.
             - The background, clothing, camera angle, lighting, and ambient shadows must not change at all.
             - Only modify pixels representing the hair-on-head region and the facial hair region.`
           }
