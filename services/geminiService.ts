@@ -165,10 +165,11 @@ export const generateStylePreview = async (
             - If a style or color is marked "Do not change" or "Keep original", you must leave that specific feature untouched.
             - Ensure the colors selected for hair and beard match the prompt exactly (e.g. if blonde is selected, hair must be dyed golden blonde).
             
-            IDENTITY & FACE PROTECTION RULES:
-            - The person's face structure, identity, eyes, nose, lips, jawline, skin tone, skin pores, expression, and shape of the skull must remain 100% IDENTICAL to the input photo.
-            - The background, clothing, camera angle, lighting, and ambient shadows must not change.
-            - Only modify pixels within the hair-on-head region and the facial hair region.`
+            IDENTITY, FACE, & SKIN PROTECTION RULES:
+            - The person's face structure, eyes, nose, lips, jawline, ears, head shape, and overall identity must remain 100% identical to the input photo.
+            - STRICT SKIN TEXTURE PRESERVATION: Do NOT smooth, blur, soften, filter, or airbrush the skin. The skin texture must remain completely natural, showing the original pores, freckles, wrinkles, facial lines, grain, skin tone, and details exactly as they are in the original image. Avoid any 'beautified', 'plastic', or 'airbrushed' look on the skin.
+            - The background, clothing, camera angle, lighting, and ambient shadows must not change at all.
+            - Only modify pixels representing the hair-on-head region and the facial hair region.`
           }
         ]
       }
