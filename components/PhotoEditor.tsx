@@ -353,21 +353,21 @@ export const PhotoEditor: React.FC<PhotoEditorProps> = ({ appState, onUpdateStat
               type="button"
               onClick={handleGenerate}
               disabled={appState.isProcessing}
-              className={`w-full py-2.5 rounded-xl font-bold text-xs uppercase tracking-widest shadow-lg transition-all active:scale-[0.98] border flex items-center justify-center gap-2 ${
+              className={`w-full py-2.5 rounded-xl font-bold text-xs uppercase tracking-widest transition-all active:scale-[0.98] border flex items-center justify-center gap-2 ${
                 appState.isProcessing
-                  ? 'bg-black/40 text-white/40 border-white/5 cursor-not-allowed'
-                  : 'bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white border-indigo-400/20 shadow-indigo-900/30'
+                  ? 'bg-white/5 text-white/30 border-white/5 cursor-not-allowed'
+                  : 'bg-white/10 backdrop-blur-md hover:bg-white/15 text-white border-white/20 hover:border-white/30 shadow-[0_4px_12px_rgba(0,0,0,0.15)]'
               }`}
             >
               {appState.isProcessing ? (
                 <>
                   <div className="animate-spin rounded-full h-3.5 w-3.5 border-b-2 border-white"></div>
-                  <span>Designing Look...</span>
+                  <span>Generating...</span>
                 </>
               ) : (
                 <>
                   <Icons.Magic className="w-3.5 h-3.5 text-white" />
-                  <span>{appState.gender === Gender.MALE ? "Generate Hair & Beard" : "Generate Hair Style"}</span>
+                  <span>Generate</span>
                 </>
               )}
             </button>
