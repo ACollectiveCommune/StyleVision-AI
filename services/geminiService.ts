@@ -1,7 +1,5 @@
-import { GoogleGenAI } from "@google/genai";
 import { AppState, Gender } from "../types";
-
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+import { Capacitor } from "@capacitor/core";
 
 // Helper to extract mime type and base64 data from a Data URL
 const parseDataUrl = (dataUrl: string) => {
@@ -81,17 +79,14 @@ export const generateStylePreview = async (
   const promptParts: string[] = [];
 
   // --- 1. Base Instruction ---
-  // Add random seed equivalent to ensure unique generation attempt per request
   promptParts.push(`Task: Edit the photo of the person. ID: ${Date.now()}`);
   
   // --- 2. Hair Style Logic ---
-  // If 'original' or null -> Explicitly keep original.
   if (!selectedHairStyle || selectedHairStyle.id === 'original') {
     promptParts.push("CONSTRAINT: Keep the original hairstyle exactly as it is. Do NOT change the hair length or shape.");
   } else if (selectedHairStyle.id === 'none') {
     promptParts.push("CONSTRAINT: Keep the original hairstyle.");
   } else {
-    // Apply specific style
     const desc = STYLE_PROMPTS[selectedHairStyle.id] || selectedHairStyle.label;
     promptParts.push(`ACTION: Change the hairstyle to ${desc}. Replace the existing hair completely. Make the change drastic and visible.`);
   }
@@ -106,7 +101,6 @@ export const generateStylePreview = async (
 
   // --- 4. Beard Logic (Male Only) ---
   if (gender === Gender.MALE) {
-    // Beard Style
     if (!selectedBeardStyle || selectedBeardStyle.id === 'original') {
          promptParts.push("CONSTRAINT: Keep the original beard (or lack of beard) exactly as it is.");
     } else if (selectedBeardStyle.id === 'none') {
@@ -116,7 +110,6 @@ export const generateStylePreview = async (
          promptParts.push(`ACTION: Change the beard style to ${desc}.`);
     }
 
-    // Beard Color
     if (!selectedBeardColor || selectedBeardColor.id === 'original') {
          promptParts.push("CONSTRAINT: Keep the original beard color.");
     } else {
@@ -128,7 +121,6 @@ export const generateStylePreview = async (
          }
     }
   } else {
-    // Female - Strict No Beard
     promptParts.push("CONSTRAINT: Ensure face is clean shaven (no beard).");
   }
 
@@ -147,8 +139,16 @@ export const generateStylePreview = async (
   try {
     const { mimeType, data } = parseDataUrl(currentState.originalImage);
 
-    const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash-image',
+    // Setup base URL. If in development on web local browser, route through Vite proxy to bypass CORS
+    let baseUrl = "https://generativelanguage.googleapis.com";
+    if (!Capacitor.isNativePlatform() && window.location.hostname === "localhost") {
+      baseUrl = window.location.origin + "/api-gemini";
+    }
+
+    const apiKey = process.env.API_KEY || import.meta.env.VITE_GEMINI_API_KEY || "";
+    const url = `${baseUrl}/v1beta/models/gemini-2.5-flash-image:generateContent?key=${apiKey}`;
+
+    const payload = {
       contents: {
         parts: [
           {
@@ -162,14 +162,30 @@ export const generateStylePreview = async (
           },
         ],
       },
+    };
+
+    const response = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(payload),
     });
 
-    const candidates = response.candidates;
+    if (!response.ok) {
+      const errText = await response.text();
+      console.error("Gemini API direct error response:", errText);
+      throw new Error(`Gemini API returned status ${response.status}`);
+    }
+
+    const resData = await response.json();
+    const candidates = resData.candidates;
     if (candidates && candidates.length > 0) {
       const parts = candidates[0].content.parts;
       for (const part of parts) {
         if (part.inlineData && part.inlineData.data) {
-          return `data:image/jpeg;base64,${part.inlineData.data}`;
+          const returnedMime = part.inlineData.mimeType || "image/png";
+          return `data:${returnedMime};base64,${part.inlineData.data}`;
         }
       }
     }
