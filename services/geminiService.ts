@@ -100,22 +100,23 @@ const applyDifferenceMask = async (originalSrc: string, generatedSrc: string, cu
         const isNewBeardSelected = currentState.selectedBeardStyle && currentState.selectedBeardStyle.id !== 'original';
         const isBeardRegion = (y >= h * 0.58) || (y >= h * 0.45 && Math.abs(x - cx) > w * 0.20);
 
-        // Only restore original details if we are NOT in the active beard edit region
-        if (!(isNewBeardSelected && isBeardRegion)) {
-          if (colorDist < threshold - featherColor) {
-            // No significant change: Restore original details (pores, skin lines, eyebrows)
-            finalR = r1;
-            finalG = g1;
-            finalB = b1;
-            finalA = a1;
-          } else if (colorDist < threshold + featherColor) {
-            // Transition zone: Blend smoothly
-            const factor = (colorDist - (threshold - featherColor)) / (2 * featherColor);
-            finalR = Math.round(r1 * (1 - factor) + r2 * factor);
-            finalG = Math.round(g1 * (1 - factor) + g2 * factor);
-            finalB = Math.round(b1 * (1 - factor) + b2 * factor);
-            finalA = Math.round(a1 * (1 - factor) + a2 * factor);
-          }
+        // Dynamically lower threshold in beard area to allow stubble-to-skin edits to pass through,
+        // while preserving micro-details on unchanged regions without creating harsh cut-off edges.
+        const currentThreshold = (isNewBeardSelected && isBeardRegion) ? 22 : threshold;
+
+        if (colorDist < currentThreshold - featherColor) {
+          // No significant change: Restore original details (pores, skin lines, eyebrows)
+          finalR = r1;
+          finalG = g1;
+          finalB = b1;
+          finalA = a1;
+        } else if (colorDist < currentThreshold + featherColor) {
+          // Transition zone: Blend smoothly
+          const factor = (colorDist - (currentThreshold - featherColor)) / (2 * featherColor);
+          finalR = Math.round(r1 * (1 - factor) + r2 * factor);
+          finalG = Math.round(g1 * (1 - factor) + g2 * factor);
+          finalB = Math.round(b1 * (1 - factor) + b2 * factor);
+          finalA = Math.round(a1 * (1 - factor) + a2 * factor);
         }
 
         // --- Central Face Eye-Nose Exclusion Zone ---
