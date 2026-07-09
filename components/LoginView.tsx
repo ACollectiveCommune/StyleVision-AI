@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
-import { loginWithGoogle, loginWithApple, auth } from '../services/firebase';
-import { signInAnonymously } from 'firebase/auth';
+import { loginWithGoogle, loginWithApple, signInAnonymously, auth } from '../services/firebase';
 
 interface LoginViewProps {
   onLoginStateChange: (loading: boolean) => void;
