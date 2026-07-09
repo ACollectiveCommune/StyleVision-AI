@@ -22,7 +22,7 @@ const loadImage = (src: string): Promise<HTMLImageElement> => {
 };
 
 // Client-side Pixel-by-Pixel difference restorer with spatial face-masking
-const applyDifferenceMask = async (originalSrc: string, generatedSrc: string): Promise<string> => {
+const applyDifferenceMask = async (originalSrc: string, generatedSrc: string, currentState: AppState): Promise<string> => {
   try {
     const [imgOrig, imgGen] = await Promise.all([
       loadImage(originalSrc),
@@ -83,16 +83,30 @@ const applyDifferenceMask = async (originalSrc: string, generatedSrc: string): P
       const dy = (y - cy) / ry;
       const ellipseDistance = dx * dx + dy * dy; // <= 1.0 is inside face, > 1.0 is outside
 
-      if (ellipseDistance > 1.25) {
-        // 100% OUTSIDE FACE (Hair, Ears, Shoulders, Background)
-        // Always use the generated image directly to prevent ghosting/bleeding of original ears/hair
+      const isHairEdited = (currentState.selectedHairStyle && currentState.selectedHairStyle.id !== 'original') ||
+                           (currentState.selectedHairColor && currentState.selectedHairColor.id !== 'original');
+      const isBeardEdited = (currentState.selectedBeardStyle && currentState.selectedBeardStyle.id !== 'original') ||
+                            (currentState.selectedBeardColor && currentState.selectedBeardColor.id !== 'original');
+
+      const nx = x / w;
+      const ny = y / h;
+
+      // Classify spatial regions
+      const isHairRegion = (ny < 0.42) || (ellipseDistance > 0.85 && ny < 0.70);
+      const isBeardRegion = (ny >= 0.58) || (ny >= 0.45 && Math.abs(nx - 0.5) > 0.20);
+      
+      const isEyebrowsOrEyes = (nx >= 0.28 && nx <= 0.72) && (ny >= 0.34 && ny <= 0.50);
+      const isNose = (nx >= 0.38 && nx <= 0.62) && (ny >= 0.50 && ny <= 0.58);
+      const isLips = (nx >= 0.36 && nx <= 0.64) && (ny >= 0.60 && ny <= 0.72);
+
+      if (ellipseDistance > 1.25 && isHairEdited) {
+        // Hair is edited, and we are in the outer hair region: Use generated pixels directly
         outputData.data[i] = r2;
         outputData.data[i+1] = g2;
         outputData.data[i+2] = b2;
         outputData.data[i+3] = a2;
       } else {
-        // INSIDE FACE OR TRANSITION REGION
-        // Calculate difference color distance
+        // INSIDE FACE OR TRANSITION REGION OR NOT-EDITED OUTER REGION
         const colorDist = Math.sqrt(
           (r1 - r2) * (r1 - r2) +
           (g1 - g2) * (g1 - g2) +
@@ -101,30 +115,49 @@ const applyDifferenceMask = async (originalSrc: string, generatedSrc: string): P
 
         let finalR = r2, finalG = g2, finalB = b2, finalA = a2;
 
-        if (colorDist < threshold - featherColor) {
-          // No significant change: Restore original details (pores, skin lines, eyebrows)
+        // Set dynamic threshold based on semantic facial zones
+        let currentThreshold = 32;
+        let currentFeather = 8;
+
+        if (isEyebrowsOrEyes || isNose) {
+          // Eyes, eyebrows, and nose: highly conservative threshold to prevent any color tinting
+          currentThreshold = 95;
+          currentFeather = 5;
+        } else if (isLips) {
+          // Lips/Mouth: prevent lip color shifts
+          currentThreshold = 80;
+          currentFeather = 5;
+        } else if (isHairRegion && !isHairEdited) {
+          // Outer/upper hair is not edited: force preserve original
+          currentThreshold = 999;
+        } else if (isBeardRegion && !isBeardEdited) {
+          // Beard is not edited: force preserve original facial hair/skin details
+          currentThreshold = 999;
+        }
+
+        if (colorDist < currentThreshold - currentFeather) {
+          // Restore original details (pores, skin lines, eyebrows)
           finalR = r1;
           finalG = g1;
           finalB = b1;
           finalA = a1;
-        } else if (colorDist < threshold + featherColor) {
+        } else if (colorDist < currentThreshold + currentFeather) {
           // Transition zone: Blend smoothly
-          const factor = (colorDist - (threshold - featherColor)) / (2 * featherColor);
+          const factor = (colorDist - (currentThreshold - currentFeather)) / (2 * currentFeather);
           finalR = Math.round(r1 * (1 - factor) + r2 * factor);
           finalG = Math.round(g1 * (1 - factor) + g2 * factor);
           finalB = Math.round(b1 * (1 - factor) + b2 * factor);
           finalA = Math.round(a1 * (1 - factor) + a2 * factor);
         }
 
-        if (ellipseDistance > 0.85) {
-          // Boundary of the face ellipse: Blend smoothly with the fully generated region
+        // Apply spatial boundary blending for the outer ellipse if hair is edited
+        if (ellipseDistance > 0.85 && isHairEdited) {
           const spatialFactor = (ellipseDistance - 0.85) / 0.40; // 0 at 0.85, 1 at 1.25
           outputData.data[i] = Math.round(finalR * (1 - spatialFactor) + r2 * spatialFactor);
           outputData.data[i+1] = Math.round(finalG * (1 - spatialFactor) + g2 * spatialFactor);
           outputData.data[i+2] = Math.round(finalB * (1 - spatialFactor) + b2 * spatialFactor);
           outputData.data[i+3] = Math.round(finalA * (1 - spatialFactor) + a2 * spatialFactor);
         } else {
-          // Center of the face: Use the difference mask result directly
           outputData.data[i] = finalR;
           outputData.data[i+1] = finalG;
           outputData.data[i+2] = finalB;
@@ -352,7 +385,7 @@ export const generateStylePreview = async (
           const generatedBase64 = `data:${returnedMime};base64,${part.inlineData.data}`;
           
           // Apply pixel-by-pixel difference mask to restore original face skin and eyebrows perfectly
-          const blendedBase64 = await applyDifferenceMask(currentState.originalImage, generatedBase64);
+          const blendedBase64 = await applyDifferenceMask(currentState.originalImage, generatedBase64, currentState);
           return blendedBase64;
         }
       }
