@@ -215,13 +215,14 @@ export const generateStylePreview = async (
     promptParts.push("- FACIAL HAIR: The face must remain completely clean-shaven with absolutely no mustache, stubble, or beard.");
   }
 
-  // --- 4. STRICT PRESERVATION IN USER PROMPT ---
+  // --- 4. STRICT PRESERVATION & ALIGNMENT IN USER PROMPT ---
   promptParts.push(`
     CRITICAL QUALITY CONTROL RULES:
     1. Only modify the hair and facial hair regions. 
     2. Do NOT change the shape, color, or style of anything else.
-    3. Do NOT smooth, blur, soften, or airbrush the skin. Keep all natural skin texture, visible pores, freckles, and natural skin details exactly as in the original image.
-    4. Keep the eyebrows 100% identical to the original image in shape, thickness, position, and color.
+    3. NO HEAD SHIFTING: The head position, size, rotation, and angle must remain in the exact same pixel coordinates as the input photo. Do NOT shift, rotate, scale, or move the head. The eyes, nose, mouth, and chin must align perfectly.
+    4. Do NOT smooth, blur, soften, or airbrush the skin. Keep all natural skin texture, visible pores, freckles, and natural skin details exactly as in the original image.
+    5. Keep the eyebrows 100% identical to the original image in shape, thickness, position, and color.
   `);
 
   const prompt = promptParts.join("\n");
@@ -262,8 +263,8 @@ export const generateStylePreview = async (
             - If a style or color is marked "Do not change" or "Keep original", you must leave that specific feature untouched.
             - Ensure the colors selected for hair and beard match the prompt exactly (e.g. if blonde is selected, hair must be dyed golden blonde).
             
-            IDENTITY, FACE, & SKIN PROTECTION RULES:
-            - The person's face structure, eyes, nose, lips, jawline, ears, head shape, and overall identity must remain 100% identical to the input photo.
+            IDENTITY, FACE, & SPATIAL ALIGNMENT RULES:
+            - NO HEAD SHIFTING: The head position, size, rotation, and angle must remain in the exact same pixel coordinates as the input photo. Do NOT shift, rotate, scale, or move the head. The eyes, eyebrows, nose, mouth, and chin must align perfectly.
             - STRICT SKIN TEXTURE PRESERVATION: Do NOT smooth, blur, soften, filter, or airbrush the skin. The skin texture must remain completely natural, showing the original pores, freckles, wrinkles, facial lines, grain, skin tone, and details exactly as they are in the original image. Avoid any 'beautified', 'plastic', or 'airbrushed' look on the skin.
             - STRICT EYEBROW PRESERVATION: Do NOT modify the eyebrows. The shape, thickness, arches, density, color, and placement of the eyebrows must remain exactly identical to the input image.
             - The background, clothing, camera angle, lighting, and ambient shadows must not change at all.
