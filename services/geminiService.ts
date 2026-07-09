@@ -22,7 +22,7 @@ const loadImage = (src: string): Promise<HTMLImageElement> => {
 };
 
 // Client-side Pixel-by-Pixel difference restorer with spatial face-masking
-const applyDifferenceMask = async (originalSrc: string, generatedSrc: string, currentState: AppState): Promise<string> => {
+const applyDifferenceMask = async (originalSrc: string, generatedSrc: string): Promise<string> => {
   try {
     const [imgOrig, imgGen] = await Promise.all([
       loadImage(originalSrc),
@@ -56,8 +56,12 @@ const applyDifferenceMask = async (originalSrc: string, generatedSrc: string, cu
     const ry = h * 0.22; // Vertical radius (covers forehead to chin)
 
     const len = origData.data.length;
-    const threshold = 55; // Color distance threshold
-    const featherColor = 10; // Color blend boundary width
+    
+    // We use a lower threshold of 32 (with a feather of 8) so that AI-generated shifts/shadows
+    // are cleanly applied without leaving "residue" outlines, while preserving high-contrast
+    // micro-features (like eyebrows/eyes) perfectly.
+    const threshold = 32; 
+    const featherColor = 8; 
 
     for (let i = 0; i < len; i += 4) {
       const pxIdx = i / 4;
@@ -97,48 +101,19 @@ const applyDifferenceMask = async (originalSrc: string, generatedSrc: string, cu
 
         let finalR = r2, finalG = g2, finalB = b2, finalA = a2;
 
-        const isNewBeardSelected = currentState.selectedBeardStyle && currentState.selectedBeardStyle.id !== 'original';
-        const isBeardRegion = (y >= h * 0.58) || (y >= h * 0.45 && Math.abs(x - cx) > w * 0.20);
-
-        // Dynamically lower threshold in beard area to allow stubble-to-skin edits to pass through,
-        // while preserving micro-details on unchanged regions without creating harsh cut-off edges.
-        const currentThreshold = (isNewBeardSelected && isBeardRegion) ? 22 : threshold;
-
-        if (colorDist < currentThreshold - featherColor) {
+        if (colorDist < threshold - featherColor) {
           // No significant change: Restore original details (pores, skin lines, eyebrows)
           finalR = r1;
           finalG = g1;
           finalB = b1;
           finalA = a1;
-        } else if (colorDist < currentThreshold + featherColor) {
+        } else if (colorDist < threshold + featherColor) {
           // Transition zone: Blend smoothly
-          const factor = (colorDist - (currentThreshold - featherColor)) / (2 * featherColor);
+          const factor = (colorDist - (threshold - featherColor)) / (2 * featherColor);
           finalR = Math.round(r1 * (1 - factor) + r2 * factor);
           finalG = Math.round(g1 * (1 - factor) + g2 * factor);
           finalB = Math.round(b1 * (1 - factor) + b2 * factor);
           finalA = Math.round(a1 * (1 - factor) + a2 * factor);
-        }
-
-        // --- Central Face Eye-Nose Exclusion Zone ---
-        // This column spans the horizontal middle of the face where no beard grows.
-        // We force it to remain 100% original to eliminate any AI-generated nostril shifts,
-        // lip boundaries, or lighting mismatch residues around the nose and eyes.
-        let excludeFactor = 0;
-        if (x >= w * 0.30 && x <= w * 0.70) {
-          if (y < h * 0.54) {
-            // Upper face center: 100% original (eyes, nose bridge, eyebrows, forehead)
-            excludeFactor = 1.0;
-          } else if (y >= h * 0.54 && y <= h * 0.59) {
-            // Soft vertical blend transition right between the nostrils/nose base and the upper lip/mustache
-            excludeFactor = (h * 0.59 - y) / (h * 0.59 - h * 0.54);
-          }
-        }
-
-        if (excludeFactor > 0) {
-          finalR = Math.round(finalR * (1 - excludeFactor) + r1 * excludeFactor);
-          finalG = Math.round(finalG * (1 - excludeFactor) + g1 * excludeFactor);
-          finalB = Math.round(finalB * (1 - excludeFactor) + b1 * excludeFactor);
-          finalA = Math.round(finalA * (1 - excludeFactor) + a1 * excludeFactor);
         }
 
         if (ellipseDistance > 0.85) {
@@ -377,7 +352,7 @@ export const generateStylePreview = async (
           const generatedBase64 = `data:${returnedMime};base64,${part.inlineData.data}`;
           
           // Apply pixel-by-pixel difference mask to restore original face skin and eyebrows perfectly
-          const blendedBase64 = await applyDifferenceMask(currentState.originalImage, generatedBase64, currentState);
+          const blendedBase64 = await applyDifferenceMask(currentState.originalImage, generatedBase64);
           return blendedBase64;
         }
       }
