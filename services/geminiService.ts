@@ -22,7 +22,7 @@ const loadImage = (src: string): Promise<HTMLImageElement> => {
 };
 
 // Client-side Pixel-by-Pixel difference restorer with spatial face-masking
-const applyDifferenceMask = async (originalSrc: string, generatedSrc: string): Promise<string> => {
+const applyDifferenceMask = async (originalSrc: string, generatedSrc: string, currentState: AppState): Promise<string> => {
   try {
     const [imgOrig, imgGen] = await Promise.all([
       loadImage(originalSrc),
@@ -97,19 +97,25 @@ const applyDifferenceMask = async (originalSrc: string, generatedSrc: string): P
 
         let finalR = r2, finalG = g2, finalB = b2, finalA = a2;
 
-        if (colorDist < threshold - featherColor) {
-          // No significant change: Restore original details (pores, skin lines, eyebrows)
-          finalR = r1;
-          finalG = g1;
-          finalB = b1;
-          finalA = a1;
-        } else if (colorDist < threshold + featherColor) {
-          // Transition zone: Blend smoothly
-          const factor = (colorDist - (threshold - featherColor)) / (2 * featherColor);
-          finalR = Math.round(r1 * (1 - factor) + r2 * factor);
-          finalG = Math.round(g1 * (1 - factor) + g2 * factor);
-          finalB = Math.round(b1 * (1 - factor) + b2 * factor);
-          finalA = Math.round(a1 * (1 - factor) + a2 * factor);
+        const isNewBeardSelected = currentState.selectedBeardStyle && currentState.selectedBeardStyle.id !== 'original';
+        const isBeardRegion = (y >= h * 0.58) || (y >= h * 0.45 && Math.abs(x - cx) > w * 0.20);
+
+        // Only restore original details if we are NOT in the active beard edit region
+        if (!(isNewBeardSelected && isBeardRegion)) {
+          if (colorDist < threshold - featherColor) {
+            // No significant change: Restore original details (pores, skin lines, eyebrows)
+            finalR = r1;
+            finalG = g1;
+            finalB = b1;
+            finalA = a1;
+          } else if (colorDist < threshold + featherColor) {
+            // Transition zone: Blend smoothly
+            const factor = (colorDist - (threshold - featherColor)) / (2 * featherColor);
+            finalR = Math.round(r1 * (1 - factor) + r2 * factor);
+            finalG = Math.round(g1 * (1 - factor) + g2 * factor);
+            finalB = Math.round(b1 * (1 - factor) + b2 * factor);
+            finalA = Math.round(a1 * (1 - factor) + a2 * factor);
+          }
         }
 
         // --- Central Face Eye-Nose Exclusion Zone ---
@@ -370,7 +376,7 @@ export const generateStylePreview = async (
           const generatedBase64 = `data:${returnedMime};base64,${part.inlineData.data}`;
           
           // Apply pixel-by-pixel difference mask to restore original face skin and eyebrows perfectly
-          const blendedBase64 = await applyDifferenceMask(currentState.originalImage, generatedBase64);
+          const blendedBase64 = await applyDifferenceMask(currentState.originalImage, generatedBase64, currentState);
           return blendedBase64;
         }
       }
