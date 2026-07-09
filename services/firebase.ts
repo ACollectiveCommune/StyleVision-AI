@@ -115,6 +115,10 @@ export const signInAnonymously = async (authInstance: any) => {
 export const loginWithGoogle = async () => {
   if (isFirebaseEnabled) {
     if (Capacitor.isNativePlatform()) {
+      try {
+        // Clear any stale native session from keychain to prevent "ID Token expired" issues
+        await FirebaseAuthentication.signOut();
+      } catch (e) {}
       const result = await FirebaseAuthentication.signInWithGoogle({});
       if (result.credential) {
         const credential = GoogleAuthProvider.credential(
@@ -145,6 +149,10 @@ export const loginWithGoogle = async () => {
 export const loginWithApple = async () => {
   if (isFirebaseEnabled) {
     if (Capacitor.isNativePlatform()) {
+      try {
+        // Clear any stale native session from keychain
+        await FirebaseAuthentication.signOut();
+      } catch (e) {}
       const result = await FirebaseAuthentication.signInWithApple({});
       if (result.credential) {
         const provider = new OAuthProvider('apple.com');
