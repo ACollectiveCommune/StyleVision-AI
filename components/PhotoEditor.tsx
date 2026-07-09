@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { AppState, StyleOption, Gender } from '../types';
 import { Icons, HAIR_STYLES_MALE, HAIR_STYLES_FEMALE, BEARD_STYLES, HAIR_COLORS, BEARD_COLORS, StyleIllustration } from '../constants';
 import { generateStylePreview } from '../services/geminiService';
+import { auth, saveGeneration, uploadImageToStorage, toggleFavorite } from '../services/firebase';
 
 interface PhotoEditorProps {
   appState: AppState;
@@ -13,12 +14,19 @@ export const PhotoEditor: React.FC<PhotoEditorProps> = ({ appState, onUpdateStat
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [isControlsVisible, setIsControlsVisible] = useState(true);
 
+  // Firestore sync state
+  const [currentDocId, setCurrentDocId] = useState<string | null>(null);
+  const [isFavorited, setIsFavorited] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+
   // Ref to track the latest request ID to prevent race conditions during retries
   const latestRequestId = useRef(0);
 
-  // Auto-open controls when a new image is loaded or mode changes
+  // Auto-open controls and reset sync IDs when a new image is loaded or mode changes
   useEffect(() => {
     setIsControlsVisible(true);
+    setCurrentDocId(null);
+    setIsFavorited(false);
   }, [appState.originalImage, appState.currentMode]);
 
   // Manual Generation Handler
@@ -28,12 +36,44 @@ export const PhotoEditor: React.FC<PhotoEditorProps> = ({ appState, onUpdateStat
     const requestId = ++latestRequestId.current;
     onUpdateState({ isProcessing: true });
     setErrorMsg(null);
+    setCurrentDocId(null);
+    setIsFavorited(false);
     
     try {
       const newImage = await generateStylePreview(appState);
-      // Only update if this is the latest request (prevents stale overwrites)
+      
       if (requestId === latestRequestId.current) {
         onUpdateState({ currentImage: newImage, isProcessing: false });
+        
+        // Auto-save styling prediction to Firestore
+        const user = auth.currentUser;
+        if (user && appState.originalImage) {
+          setIsSaving(true);
+          try {
+            // 1. Upload assets to Storage
+            const originalUrl = await uploadImageToStorage(user.uid, appState.originalImage, 'original');
+            const generatedUrl = await uploadImageToStorage(user.uid, newImage, 'generated');
+            
+            // 2. Record details in Firestore
+            const docId = await saveGeneration(user.uid, {
+              originalImageUrl: originalUrl,
+              generatedImageUrl: generatedUrl,
+              hairStyle: appState.selectedHairStyle?.id || 'original',
+              hairColor: appState.selectedHairColor?.id || 'original',
+              beardStyle: appState.gender === Gender.MALE ? (appState.selectedBeardStyle?.id || 'original') : 'none',
+              beardColor: appState.gender === Gender.MALE ? (appState.selectedBeardColor?.id || 'original') : 'none',
+              gender: appState.gender,
+              isFavorite: false
+            });
+            
+            setCurrentDocId(docId);
+          } catch (storageErr) {
+            console.error("Failed to sync to database:", storageErr);
+            // Non-blocking error, user can still see output
+          } finally {
+            setIsSaving(false);
+          }
+        }
       }
     } catch (err) {
       if (requestId === latestRequestId.current) {
@@ -43,6 +83,20 @@ export const PhotoEditor: React.FC<PhotoEditorProps> = ({ appState, onUpdateStat
       }
     }
   }, [appState, onUpdateState]);
+
+  // Toggle favorite helper
+  const handleToggleFavorite = async () => {
+    const user = auth.currentUser;
+    if (!user || !currentDocId || isSaving) return;
+    try {
+      const nextState = !isFavorited;
+      await toggleFavorite(user.uid, currentDocId, nextState);
+      setIsFavorited(nextState);
+    } catch (err) {
+      console.error("Failed to toggle favorite:", err);
+      setErrorMsg("Failed to save favorite style.");
+    }
+  };
 
   // Style Selection Handler - Updates state only, does not trigger API
   const handleSelectStyle = (option: StyleOption) => {
@@ -65,6 +119,7 @@ export const PhotoEditor: React.FC<PhotoEditorProps> = ({ appState, onUpdateStat
       document.body.removeChild(link);
     }
   };
+
 
   const activeImage = showOriginal ? appState.originalImage : (appState.currentImage || appState.originalImage);
   const hairStyles = appState.gender === Gender.MALE ? HAIR_STYLES_MALE : HAIR_STYLES_FEMALE;
@@ -112,13 +167,34 @@ export const PhotoEditor: React.FC<PhotoEditorProps> = ({ appState, onUpdateStat
           onMouseUp={() => setShowOriginal(false)}
           onTouchStart={() => setShowOriginal(true)}
           onTouchEnd={() => setShowOriginal(false)}
+          title="Hold to view original"
         >
           <Icons.Eye />
         </button>
         <button 
           type="button"
+          onClick={handleToggleFavorite}
+          disabled={!currentDocId || isSaving}
+          className={`w-10 h-10 rounded-full bg-black/30 backdrop-blur-xl flex items-center justify-center border transition-all active:scale-90 shadow-lg ${
+            isFavorited 
+              ? 'text-red-500 border-red-500/30' 
+              : 'text-white border-white/10 disabled:opacity-40'
+          }`}
+          title={isSaving ? "Saving to database..." : "Add to Favorites"}
+        >
+          {isSaving ? (
+            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+          ) : (
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill={isFavorited ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2.5">
+              <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
+            </svg>
+          )}
+        </button>
+        <button 
+          type="button"
           onClick={downloadImage}
           className="w-10 h-10 rounded-full bg-black/30 backdrop-blur-xl flex items-center justify-center text-white border border-white/10 active:scale-90 transition-transform shadow-lg"
+          title="Download photo"
         >
           <Icons.Download />
         </button>

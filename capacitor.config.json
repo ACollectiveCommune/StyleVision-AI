@@ -1,0 +1,13 @@
+{
+  "appId": "com.stylevision.ai",
+  "appName": "StyleVision AI",
+  "webDir": "dist",
+  "plugins": {
+    "FirebaseAuthentication": {
+      "providers": [
+        "google.com",
+        "apple.com"
+      ]
+    }
+  }
+}
