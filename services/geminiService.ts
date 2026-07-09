@@ -115,18 +115,22 @@ const applyDifferenceMask = async (originalSrc: string, generatedSrc: string, cu
 
         let finalR = r2, finalG = g2, finalB = b2, finalA = a2;
 
-        // Set dynamic threshold based on semantic facial zones
+        // Set dynamic threshold based on semantic facial zones with soft boundaries
         let currentThreshold = 32;
         let currentFeather = 8;
 
-        if (isEyebrowsOrEyes || isNose) {
-          // Eyes, eyebrows, and nose: highly conservative threshold to prevent any color tinting
-          currentThreshold = 95;
-          currentFeather = 5;
-        } else if (isLips) {
-          // Lips/Mouth: prevent lip color shifts
-          currentThreshold = 80;
-          currentFeather = 5;
+        // Lips Box (rx = 0.14, ry = 0.06, center = [0.5, 0.66])
+        const distLips = Math.max(Math.abs(nx - 0.5) / 0.14, Math.abs(ny - 0.66) / 0.06);
+
+        // Eyebrows/Eyes/Nose Box (rx = 0.22, ry = 0.12, center = [0.5, 0.46])
+        const distFace = Math.max(Math.abs(nx - 0.5) / 0.22, Math.abs(ny - 0.46) / 0.12);
+
+        if (distFace < 1.0) {
+          // Smoothly scale threshold up to 999 at the center of eyes/nose/brows
+          currentThreshold = Math.round(32 + (999 - 32) * (1.0 - distFace));
+        } else if (distLips < 1.0) {
+          // Smoothly scale threshold up to 999 at the center of the lips
+          currentThreshold = Math.round(32 + (999 - 32) * (1.0 - distLips));
         } else if (isHairRegion && !isHairEdited) {
           // Outer/upper hair is not edited: force preserve original
           currentThreshold = 999;
