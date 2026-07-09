@@ -245,26 +245,7 @@ export const PhotoEditor: React.FC<PhotoEditorProps> = ({ appState, onUpdateStat
         </button>
       </div>
 
-      {/* 3. Generate Button (Floating Top Left) */}
-      <div className="absolute top-24 left-4 z-30 pointer-events-auto">
-        <button
-            type="button"
-            onClick={handleGenerate}
-            disabled={appState.isProcessing}
-            className={`w-11 h-11 rounded-full flex items-center justify-center shadow-xl border backdrop-blur-md transition-all active:scale-95 duration-200 ${
-                appState.isProcessing 
-                ? 'bg-black/40 border-white/5 cursor-not-allowed text-white/40' 
-                : 'bg-gradient-to-tr from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white border-indigo-400/30 shadow-[0_4px_12px_rgba(99,102,241,0.4)]'
-            }`}
-            title="Generate styling preview"
-        >
-            {appState.isProcessing ? (
-                 <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-            ) : (
-                 <Icons.Magic className="w-4 h-4 text-white drop-shadow-[0_0_6px_rgba(255,255,255,0.4)]" />
-            )}
-        </button>
-      </div>
+      {/* 3. Floating Action Controls (Top Right) */}
 
       {/* 4. Editor Controls Overlay (Bottom) */}
       {isControlsVisible ? (
@@ -365,6 +346,32 @@ export const PhotoEditor: React.FC<PhotoEditorProps> = ({ appState, onUpdateStat
               </div>
             </div>
           )}
+
+          {/* Generate Button */}
+          <div className="px-4 mt-3 pb-1 w-full">
+            <button
+              type="button"
+              onClick={handleGenerate}
+              disabled={appState.isProcessing}
+              className={`w-full py-2.5 rounded-xl font-bold text-xs uppercase tracking-widest shadow-lg transition-all active:scale-[0.98] border flex items-center justify-center gap-2 ${
+                appState.isProcessing
+                  ? 'bg-black/40 text-white/40 border-white/5 cursor-not-allowed'
+                  : 'bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white border-indigo-400/20 shadow-indigo-900/30'
+              }`}
+            >
+              {appState.isProcessing ? (
+                <>
+                  <div className="animate-spin rounded-full h-3.5 w-3.5 border-b-2 border-white"></div>
+                  <span>Designing Look...</span>
+                </>
+              ) : (
+                <>
+                  <Icons.Magic className="w-3.5 h-3.5 text-white" />
+                  <span>{appState.gender === Gender.MALE ? "Generate Hair & Beard" : "Generate Hair Style"}</span>
+                </>
+              )}
+            </button>
+          </div>
         </div>
       ) : (
         /* Button to bring back controls (if they were somehow closed) */
