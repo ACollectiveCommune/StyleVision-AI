@@ -4,6 +4,39 @@ import { Icons, HAIR_STYLES_MALE, HAIR_STYLES_FEMALE, BEARD_STYLES, HAIR_COLORS,
 import { generateStylePreview } from '../services/geminiService';
 import { auth, saveGeneration, uploadImageToStorage, toggleFavorite } from '../services/firebase';
 
+const compressImageBase64 = (base64Str: string, maxDim: number = 360, quality: number = 0.5): Promise<string> => {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => {
+      const canvas = document.createElement("canvas");
+      let width = img.width;
+      let height = img.height;
+      if (width > height) {
+        if (width > maxDim) {
+          height = Math.round((height * maxDim) / width);
+          width = maxDim;
+        }
+      } else {
+        if (height > maxDim) {
+          width = Math.round((width * maxDim) / height);
+          height = maxDim;
+        }
+      }
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext("2d");
+      if (ctx) {
+        ctx.drawImage(img, 0, 0, width, height);
+        resolve(canvas.toDataURL("image/jpeg", quality));
+      } else {
+        resolve(base64Str);
+      }
+    };
+    img.onerror = () => resolve(base64Str);
+    img.src = base64Str;
+  });
+};
+
 interface PhotoEditorProps {
   appState: AppState;
   onUpdateState: (updates: Partial<AppState>) => void;
@@ -51,8 +84,16 @@ export const PhotoEditor: React.FC<PhotoEditorProps> = ({ appState, onUpdateStat
           setIsSaving(true);
           try {
             // 1. Upload assets to Storage
-            const originalUrl = await uploadImageToStorage(user.uid, appState.originalImage, 'original');
-            const generatedUrl = await uploadImageToStorage(user.uid, newImage, 'generated');
+            let originalUrl = '';
+            let generatedUrl = '';
+            try {
+              originalUrl = await uploadImageToStorage(user.uid, appState.originalImage, 'original');
+              generatedUrl = await uploadImageToStorage(user.uid, newImage, 'generated');
+            } catch (storageErr) {
+              console.warn("Storage upload failed (possibly due to Spark/Blaze plan restrictions), falling back to compressed base64 inline strings in Firestore:", storageErr);
+              originalUrl = await compressImageBase64(appState.originalImage, 360, 0.4);
+              generatedUrl = await compressImageBase64(newImage, 360, 0.4);
+            }
             
             // 2. Record details in Firestore
             const docId = await saveGeneration(user.uid, {
@@ -67,8 +108,8 @@ export const PhotoEditor: React.FC<PhotoEditorProps> = ({ appState, onUpdateStat
             });
             
             setCurrentDocId(docId);
-          } catch (storageErr) {
-            console.error("Failed to sync to database:", storageErr);
+          } catch (dbErr) {
+            console.error("Failed to sync to database:", dbErr);
             // Non-blocking error, user can still see output
           } finally {
             setIsSaving(false);
