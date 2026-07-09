@@ -21,7 +21,7 @@ const loadImage = (src: string): Promise<HTMLImageElement> => {
   });
 };
 
-// Client-side Pixel-by-Pixel difference restorer
+// Client-side Pixel-by-Pixel difference restorer with spatial face-masking
 const applyDifferenceMask = async (originalSrc: string, generatedSrc: string): Promise<string> => {
   try {
     const [imgOrig, imgGen] = await Promise.all([
@@ -46,11 +46,24 @@ const applyDifferenceMask = async (originalSrc: string, generatedSrc: string): P
 
     const outputData = ctx.createImageData(canvas.width, canvas.height);
     
+    const w = canvas.width;
+    const h = canvas.height;
+    
+    // Define an elliptical face region to target our detail preservation
+    const cx = w / 2;
+    const cy = h * 0.52;
+    const rx = w * 0.22; // Horizontal radius (covers eyes, eyebrows, cheeks, nose, mouth)
+    const ry = h * 0.22; // Vertical radius (covers forehead to chin)
+
     const len = origData.data.length;
-    const threshold = 55; // Color distance threshold to isolate changes (higher value preserves more original pixels)
-    const feather = 10;   // Soft edge transition width (smaller value creates cleaner transitions for high contrast)
+    const threshold = 55; // Color distance threshold
+    const featherColor = 10; // Color blend boundary width
 
     for (let i = 0; i < len; i += 4) {
+      const pxIdx = i / 4;
+      const x = pxIdx % w;
+      const y = Math.floor(pxIdx / w);
+
       const r1 = origData.data[i];
       const g1 = origData.data[i+1];
       const b1 = origData.data[i+2];
@@ -61,32 +74,58 @@ const applyDifferenceMask = async (originalSrc: string, generatedSrc: string): P
       const b2 = genData.data[i+2];
       const a2 = genData.data[i+3];
 
-      // Euclidean color distance
-      const dist = Math.sqrt(
-        (r1 - r2) * (r1 - r2) +
-        (g1 - g2) * (g1 - g2) +
-        (b1 - b2) * (b1 - b2)
-      );
+      // Calculate spatial distance from the center of the face ellipse
+      const dx = (x - cx) / rx;
+      const dy = (y - cy) / ry;
+      const ellipseDistance = dx * dx + dy * dy; // <= 1.0 is inside face, > 1.0 is outside
 
-      if (dist < threshold - feather) {
-        // Keep original pixel exactly (for unchanged skin, eyebrows, eyes, background)
-        outputData.data[i] = r1;
-        outputData.data[i+1] = g1;
-        outputData.data[i+2] = b1;
-        outputData.data[i+3] = a1;
-      } else if (dist > threshold + feather) {
-        // Keep generated pixel exactly (for hair/beard additions and alterations)
+      if (ellipseDistance > 1.25) {
+        // 100% OUTSIDE FACE (Hair, Ears, Shoulders, Background)
+        // Always use the generated image directly to prevent ghosting/bleeding of original ears/hair
         outputData.data[i] = r2;
         outputData.data[i+1] = g2;
         outputData.data[i+2] = b2;
         outputData.data[i+3] = a2;
       } else {
-        // Linear interpolation for soft blend boundaries
-        const factor = (dist - (threshold - feather)) / (2 * feather);
-        outputData.data[i] = Math.round(r1 * (1 - factor) + r2 * factor);
-        outputData.data[i+1] = Math.round(g1 * (1 - factor) + g2 * factor);
-        outputData.data[i+2] = Math.round(b1 * (1 - factor) + b2 * factor);
-        outputData.data[i+3] = Math.round(a1 * (1 - factor) + a2 * factor);
+        // INSIDE FACE OR TRANSITION REGION
+        // Calculate difference color distance
+        const colorDist = Math.sqrt(
+          (r1 - r2) * (r1 - r2) +
+          (g1 - g2) * (g1 - g2) +
+          (b1 - b2) * (b1 - b2)
+        );
+
+        let finalR = r2, finalG = g2, finalB = b2, finalA = a2;
+
+        if (colorDist < threshold - featherColor) {
+          // No significant change: Restore original details (pores, skin lines, eyebrows)
+          finalR = r1;
+          finalG = g1;
+          finalB = b1;
+          finalA = a1;
+        } else if (colorDist < threshold + featherColor) {
+          // Transition zone: Blend smoothly
+          const factor = (colorDist - (threshold - featherColor)) / (2 * featherColor);
+          finalR = Math.round(r1 * (1 - factor) + r2 * factor);
+          finalG = Math.round(g1 * (1 - factor) + g2 * factor);
+          finalB = Math.round(b1 * (1 - factor) + b2 * factor);
+          finalA = Math.round(a1 * (1 - factor) + a2 * factor);
+        }
+
+        if (ellipseDistance > 0.85) {
+          // Boundary of the face ellipse: Blend smoothly with the fully generated region
+          const spatialFactor = (ellipseDistance - 0.85) / 0.40; // 0 at 0.85, 1 at 1.25
+          outputData.data[i] = Math.round(finalR * (1 - spatialFactor) + r2 * spatialFactor);
+          outputData.data[i+1] = Math.round(finalG * (1 - spatialFactor) + g2 * spatialFactor);
+          outputData.data[i+2] = Math.round(finalB * (1 - spatialFactor) + b2 * spatialFactor);
+          outputData.data[i+3] = Math.round(finalA * (1 - spatialFactor) + a2 * spatialFactor);
+        } else {
+          // Center of the face: Use the difference mask result directly
+          outputData.data[i] = finalR;
+          outputData.data[i+1] = finalG;
+          outputData.data[i+2] = finalB;
+          outputData.data[i+3] = finalA;
+        }
       }
     }
 
