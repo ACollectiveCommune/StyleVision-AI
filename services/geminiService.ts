@@ -47,8 +47,8 @@ const applyDifferenceMask = async (originalSrc: string, generatedSrc: string): P
     const outputData = ctx.createImageData(canvas.width, canvas.height);
     
     const len = origData.data.length;
-    const threshold = 40; // Color distance threshold to isolate changes
-    const feather = 15;   // Soft edge transition width
+    const threshold = 55; // Color distance threshold to isolate changes (higher value preserves more original pixels)
+    const feather = 10;   // Soft edge transition width (smaller value creates cleaner transitions for high contrast)
 
     for (let i = 0; i < len; i += 4) {
       const r1 = origData.data[i];
