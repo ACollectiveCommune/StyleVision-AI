@@ -188,6 +188,16 @@ export const HAIR_COLORS: StyleOption[] = [
   { id: 'blue', label: 'Blue', category: 'hair', type: 'color' },
   { id: 'green', label: 'Green', category: 'hair', type: 'color' },
   { id: 'pink', label: 'Pink', category: 'hair', type: 'color' },
+  { id: 'blonde_highlights', label: 'Blonde Highlights', category: 'hair', type: 'color' },
+  { id: 'brown_highlights', label: 'Brown Highlights', category: 'hair', type: 'color' },
+  { id: 'platinum_highlights', label: 'Platinum Highlights', category: 'hair', type: 'color' },
+  { id: 'blue_highlights', label: 'Blue Highlights', category: 'hair', type: 'color' },
+  { id: 'pink_highlights', label: 'Pink Highlights', category: 'hair', type: 'color' },
+  { id: 'blonde_ombre', label: 'Blonde Ombre', category: 'hair', type: 'color' },
+  { id: 'brown_ombre', label: 'Brown Ombre', category: 'hair', type: 'color' },
+  { id: 'red_ombre', label: 'Red Ombre', category: 'hair', type: 'color' },
+  { id: 'blue_ombre', label: 'Blue Ombre', category: 'hair', type: 'color' },
+  { id: 'pink_ombre', label: 'Pink Ombre', category: 'hair', type: 'color' },
 ];
 
 export const BEARD_COLORS: StyleOption[] = [
@@ -200,4 +210,6 @@ export const BEARD_COLORS: StyleOption[] = [
   { id: 'red', label: 'Red', category: 'beard', type: 'color' },
   { id: 'grey', label: 'Grey', category: 'beard', type: 'color' },
   { id: 'white', label: 'White', category: 'beard', type: 'color' },
+  { id: 'grey_highlights', label: 'Salt & Pepper', category: 'beard', type: 'color' },
+  { id: 'blonde_highlights', label: 'Blonde Highlights', category: 'beard', type: 'color' },
 ];

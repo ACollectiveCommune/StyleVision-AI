@@ -192,6 +192,17 @@ const COLOR_PROMPTS: Record<string, string> = {
   blue: "vibrant electric blue",
   green: "emerald green",
   pink: "hot pink",
+  blonde_highlights: "natural dark base hair with golden blonde highlights woven throughout the strands",
+  brown_highlights: "dark base hair with warm honey brown highlights woven throughout the strands",
+  platinum_highlights: "dark base hair with icy platinum silver highlights woven throughout the strands",
+  blue_highlights: "dark base hair with vibrant electric blue highlights woven throughout the strands",
+  pink_highlights: "dark base hair with bright pastel pink highlights woven throughout the strands",
+  blonde_ombre: "dark roots fading smoothly into golden blonde mid-shafts and tips (ombre style)",
+  brown_ombre: "dark roots fading smoothly into warm medium brown tips (ombre style)",
+  red_ombre: "dark roots fading smoothly into vibrant ginger red tips (ombre style)",
+  blue_ombre: "dark roots fading smoothly into electric blue tips (ombre style)",
+  pink_ombre: "dark roots fading smoothly into soft pastel pink tips (ombre style)",
+  grey_highlights: "natural salt and pepper style with silver grey highlights woven through the dark base",
 };
 
 export const generateStylePreview = async (

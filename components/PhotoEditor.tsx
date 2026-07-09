@@ -428,12 +428,27 @@ const ColorButton = ({ item, isSelected, onClick }: { item: StyleOption, isSelec
     blue: '#1e3a8a',
     green: '#14532d',
     pink: '#be185d',
-    match: 'linear-gradient(135deg, #333 0%, #999 100%)' 
+    match: 'linear-gradient(135deg, #333 0%, #999 100%)',
+    // Highlights (diagonal stripes)
+    blonde_highlights: 'linear-gradient(45deg, #2a1d17 25%, #e6c86e 25%, #e6c86e 50%, #2a1d17 50%, #2a1d17 75%, #e6c86e 75%, #e6c86e 100%)',
+    brown_highlights: 'linear-gradient(45deg, #0f0f0f 25%, #8D6E63 25%, #8D6E63 50%, #0f0f0f 50%, #0f0f0f 75%, #8D6E63 75%, #8D6E63 100%)',
+    platinum_highlights: 'linear-gradient(45deg, #2a1d17 25%, #f0f0e6 25%, #f0f0e6 50%, #2a1d17 50%, #2a1d17 75%, #f0f0e6 75%, #f0f0e6 100%)',
+    blue_highlights: 'linear-gradient(45deg, #0f0f0f 25%, #1e3a8a 25%, #1e3a8a 50%, #0f0f0f 50%, #0f0f0f 75%, #1e3a8a 75%, #1e3a8a 100%)',
+    pink_highlights: 'linear-gradient(45deg, #0f0f0f 25%, #be185d 25%, #be185d 50%, #0f0f0f 50%, #0f0f0f 75%, #be185d 75%, #be185d 100%)',
+    grey_highlights: 'linear-gradient(45deg, #0f0f0f 25%, #808080 25%, #808080 50%, #0f0f0f 50%, #0f0f0f 75%, #808080 75%, #808080 100%)',
+    // Ombre (fade top-to-bottom)
+    blonde_ombre: 'linear-gradient(to bottom, #0f0f0f 20%, #e6c86e 100%)',
+    brown_ombre: 'linear-gradient(to bottom, #0f0f0f 20%, #4a3023 100%)',
+    red_ombre: 'linear-gradient(to bottom, #0f0f0f 20%, #b93612 100%)',
+    blue_ombre: 'linear-gradient(to bottom, #0f0f0f 20%, #1e3a8a 100%)',
+    pink_ombre: 'linear-gradient(to bottom, #0f0f0f 20%, #be185d 100%)'
   };
   
-  const bgStyle = (item.id === 'match' || item.id === 'original')
-    ? { background: colorMap[item.id] } 
-    : { backgroundColor: colorMap[item.id] || '#ccc' };
+  const colorValue = colorMap[item.id] || '#ccc';
+  const isGradient = colorValue.includes('gradient');
+  const bgStyle = isGradient
+    ? { background: colorValue } 
+    : { backgroundColor: colorValue };
 
   return (
     <button 
