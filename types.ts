@@ -27,4 +27,7 @@ export interface AppState {
   selectedBeardColor: StyleOption | null;
   isProcessing: boolean;
   customPrompt?: string;
+  isPremium: boolean;
+  premiumChecked: boolean;
+  generationCount: number;
 }

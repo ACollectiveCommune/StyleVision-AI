@@ -3,6 +3,7 @@ import { AppState, StyleOption, Gender } from '../types';
 import { Icons, HAIR_STYLES_MALE, HAIR_STYLES_FEMALE, BEARD_STYLES, HAIR_COLORS, BEARD_COLORS, StyleIllustration } from '../constants';
 import { generateStylePreview } from '../services/geminiService';
 import { auth, saveGeneration, uploadImageToStorage, toggleFavorite } from '../services/firebase';
+import { createCheckoutSession, incrementGenerationCount } from '../services/billingService';
 
 const compressImageBase64 = (base64Str: string, maxDim: number = 360, quality: number = 0.5): Promise<string> => {
   return new Promise((resolve) => {
@@ -53,6 +54,11 @@ export const PhotoEditor: React.FC<PhotoEditorProps> = ({ appState, onUpdateStat
   const [isFavorited, setIsFavorited] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
+  // Billing States
+  const [showUpgradeModal, setShowUpgradeModal] = useState(false);
+  const [isUpgrading, setIsUpgrading] = useState(false);
+  const [upgradeError, setUpgradeError] = useState<string | null>(null);
+
   // Ref to track the latest request ID to prevent race conditions during retries
   const latestRequestId = useRef(0);
 
@@ -67,6 +73,14 @@ export const PhotoEditor: React.FC<PhotoEditorProps> = ({ appState, onUpdateStat
   const handleGenerate = useCallback(async () => {
     if (!appState.originalImage || appState.isProcessing) return;
     
+    const user = auth?.currentUser;
+
+    // Enforce 3 Free Trial Generations limit for non-premium users
+    if (!appState.isPremium && appState.generationCount >= 3) {
+      setShowUpgradeModal(true);
+      return;
+    }
+    
     const requestId = ++latestRequestId.current;
     onUpdateState({ isProcessing: true });
     setIsControlsVisible(false); // Auto-hide controls when generating
@@ -78,11 +92,26 @@ export const PhotoEditor: React.FC<PhotoEditorProps> = ({ appState, onUpdateStat
       const newImage = await generateStylePreview(appState);
       
       if (requestId === latestRequestId.current) {
-        onUpdateState({ currentImage: newImage, isProcessing: false });
+        // Increment generation count in Firestore/locally
+        let nextGenCount = appState.generationCount;
+        if (user) {
+          try {
+            nextGenCount = await incrementGenerationCount(user.uid);
+          } catch (countErr) {
+            console.error("Failed to increment generation count:", countErr);
+          }
+        } else {
+          nextGenCount += 1;
+        }
+
+        onUpdateState({ 
+          currentImage: newImage, 
+          isProcessing: false, 
+          generationCount: nextGenCount 
+        });
         setIsControlsVisible(true); // Restore controls on success
         
         // Auto-save styling prediction to Firestore
-        const user = auth?.currentUser;
         if (user && appState.originalImage) {
           setIsSaving(true);
           try {
@@ -452,6 +481,124 @@ export const PhotoEditor: React.FC<PhotoEditorProps> = ({ appState, onUpdateStat
              <Icons.Styles className="w-3.5 h-3.5" />
              <span className="text-[10px] font-extrabold uppercase tracking-widest">Edit Style</span>
            </button>
+        </div>
+      )}
+
+      {/* 5. Stripe Premium Upgrade Modal */}
+      {showUpgradeModal && (
+        <div className="absolute inset-0 bg-black/80 backdrop-blur-md z-50 flex items-center justify-center p-6 animate-in fade-in duration-300 pointer-events-auto">
+          <div className="bg-neutral-900 border border-white/10 rounded-3xl p-6 w-full max-w-sm flex flex-col space-y-6 shadow-2xl relative animate-in zoom-in-95 duration-300">
+            {/* Close button */}
+            <button
+              type="button"
+              onClick={() => {
+                setShowUpgradeModal(false);
+                setUpgradeError(null);
+              }}
+              className="absolute right-4 top-4 text-white/40 hover:text-white active:scale-90 transition-transform"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="18" y1="6" x2="6" y2="18"></line>
+                <line x1="6" y1="6" x2="18" y2="18"></line>
+              </svg>
+            </button>
+
+            {/* Icon & Title */}
+            <div className="flex flex-col items-center text-center space-y-2">
+              <div className="w-14 h-14 rounded-2xl bg-indigo-600/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400">
+                <Icons.Magic className="w-6 h-6" />
+              </div>
+              <h3 className="text-lg font-extrabold uppercase tracking-widest text-white mt-2">Unlock Premium</h3>
+              <p className="text-xs text-neutral-400 leading-relaxed px-2">
+                You've reached your free trial limit of 3 styling attempts. Upgrade to premium for unlimited transformations!
+              </p>
+            </div>
+
+            {/* Features List */}
+            <div className="bg-white/5 rounded-2xl p-4 border border-white/5 space-y-3">
+              {[
+                "Unlimited AI generation request quota",
+                "Lock in priority queue rendering speeds",
+                "Access premium custom styles & prompt engine",
+                "Save unlimited hair & beard configurations"
+              ].map((feature, idx) => (
+                <div key={idx} className="flex items-center gap-3">
+                  <div className="w-4 h-4 rounded-full bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center flex-shrink-0 text-emerald-400">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                      <polyline points="20 6 9 17 4 12"></polyline>
+                    </svg>
+                  </div>
+                  <span className="text-[11px] font-medium text-neutral-300">{feature}</span>
+                </div>
+              ))}
+            </div>
+
+            {/* Error Message */}
+            {upgradeError && (
+              <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-3 text-center text-[10px] font-bold tracking-wide text-red-400">
+                {upgradeError}
+              </div>
+            )}
+
+            {/* Upgrade CTA */}
+            <div className="flex flex-col space-y-3 pt-2">
+              {auth?.currentUser ? (
+                <button
+                  type="button"
+                  onClick={async () => {
+                    setIsUpgrading(true);
+                    setUpgradeError(null);
+                    try {
+                      const checkoutUrl = await createCheckoutSession(auth.currentUser!.uid);
+                      window.location.href = checkoutUrl;
+                    } catch (err: any) {
+                      console.error("Upgrade checkout failed:", err);
+                      setUpgradeError(err.message || "Failed to initiate Stripe Checkout.");
+                    } finally {
+                      setIsUpgrading(false);
+                    }
+                  }}
+                  disabled={isUpgrading}
+                  className="w-full py-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 font-extrabold text-[10px] uppercase tracking-widest text-white transition-all active:scale-[0.98] flex items-center justify-center gap-2 shadow-lg shadow-indigo-600/25"
+                >
+                  {isUpgrading ? (
+                    <>
+                      <div className="animate-spin rounded-full h-3.5 w-3.5 border-b-2 border-white"></div>
+                      <span>Redirecting to Stripe...</span>
+                    </>
+                  ) : (
+                    <span>Subscribe - $9.99 / mo</span>
+                  )}
+                </button>
+              ) : (
+                <div className="text-center space-y-2">
+                  <p className="text-[10px] text-neutral-400 font-bold uppercase tracking-wider">Please sign in to upgrade</p>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowUpgradeModal(false);
+                      // Switch to Camera mode to trigger the login overlay
+                      onUpdateState({ currentMode: AppMode.CAMERA });
+                    }}
+                    className="w-full py-3 rounded-xl bg-neutral-800 hover:bg-neutral-700 font-extrabold text-[10px] uppercase tracking-widest text-white transition-all active:scale-[0.98]"
+                  >
+                    Go to Sign In
+                  </button>
+                </div>
+              )}
+              
+              <button
+                type="button"
+                onClick={() => {
+                  setShowUpgradeModal(false);
+                  setUpgradeError(null);
+                }}
+                className="text-center text-[10px] font-bold uppercase tracking-wider text-neutral-500 hover:text-neutral-400 py-1"
+              >
+                Maybe Later
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
