@@ -128,7 +128,7 @@ const App: React.FC = () => {
     setShowAdModal(false);
     if (currentUser) {
       try {
-        const newCredits = await incrementUserCredits(currentUser.uid, 1);
+        const newCredits = await incrementUserCredits(currentUser.uid, 1, state.credits);
         updateState({ credits: newCredits, isPremium: newCredits > 0 });
       } catch (err) {
         console.error("Failed to grant ad credit:", err);

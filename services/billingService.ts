@@ -63,10 +63,23 @@ export const subscribeToCredits = (
 /**
  * Increments the user's credits balance in Firestore.
  */
-export const incrementUserCredits = async (uid: string, amount: number): Promise<number> => {
+export const incrementUserCredits = async (
+  uid: string, 
+  amount: number, 
+  currentBalance?: number
+): Promise<number> => {
   // 1. Update local storage cache immediately
   const cachedCreditsStr = localStorage.getItem(`credits_${uid}`);
-  const currentCredits = cachedCreditsStr ? parseInt(cachedCreditsStr, 10) : 5;
+  
+  let currentCredits = 0;
+  if (cachedCreditsStr !== null) {
+    currentCredits = parseInt(cachedCreditsStr, 10);
+  } else if (currentBalance !== undefined) {
+    currentCredits = currentBalance;
+  } else {
+    currentCredits = 0; // Default to 0 instead of 5 for increment requests if no cache or state is present
+  }
+
   const nextCredits = Math.max(0, currentCredits + amount);
   localStorage.setItem(`credits_${uid}`, nextCredits.toString());
 
