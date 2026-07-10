@@ -131,7 +131,7 @@ const App: React.FC = () => {
   }
 
   return (
-    <div className="relative w-full h-screen bg-black overflow-hidden font-sans text-white select-none">
+    <div className="relative w-full h-[100dvh] bg-black overflow-hidden font-sans text-white select-none">
       
       {/* --- Main Content Area --- */}
       <div className="absolute inset-0 z-0">

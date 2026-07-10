@@ -249,7 +249,7 @@ export const PhotoEditor: React.FC<PhotoEditorProps> = ({ appState, onUpdateStat
 
       {/* 4. Editor Controls Overlay (Bottom) */}
       {isControlsVisible ? (
-        <div className="absolute bottom-24 left-0 right-0 z-40 flex flex-col gap-0 pb-3 pt-1 rounded-t-3xl bg-black/60 backdrop-blur-2xl border-t border-black/30 animate-in slide-in-from-bottom duration-300 pointer-events-auto">
+        <div className="absolute bottom-[calc(5rem+env(safe-area-inset-bottom,0px))] left-0 right-0 z-40 flex flex-col gap-0 pb-3 pt-1 rounded-t-3xl bg-black/60 backdrop-blur-2xl border-t border-black/30 animate-in slide-in-from-bottom duration-300 pointer-events-auto">
           
           {/* Top Collapse Handle */}
           <div className="flex justify-center items-center h-5 cursor-pointer group" onClick={() => setIsControlsVisible(false)}>
@@ -443,8 +443,7 @@ export const PhotoEditor: React.FC<PhotoEditorProps> = ({ appState, onUpdateStat
           </div>
         </div>
       ) : (
-        /* Button to bring back controls (if they were somehow closed) */
-        <div className="absolute bottom-36 left-0 right-0 z-40 flex justify-center pointer-events-none animate-in fade-in duration-500">
+        <div className="absolute bottom-[calc(5rem+env(safe-area-inset-bottom,0px))] left-0 right-0 z-40 flex justify-center pointer-events-none animate-in fade-in duration-500">
            <button
              type="button"
              onClick={() => setIsControlsVisible(true)}
