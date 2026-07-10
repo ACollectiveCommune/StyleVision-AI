@@ -24,6 +24,14 @@ const loadImage = (src: string): Promise<HTMLImageElement> => {
 // Client-side Pixel-by-Pixel difference restorer with spatial face-masking
 const applyDifferenceMask = async (originalSrc: string, generatedSrc: string, currentState: AppState): Promise<string> => {
   try {
+    const isBeardStyleChanged = currentState.selectedBeardStyle.id !== 'original';
+    const isBeardEdited = isBeardStyleChanged || (currentState.selectedBeardColor.id !== 'original');
+
+    if (isBeardEdited) {
+      console.log("[MASK LOG] Beard is edited. Bypassing difference mask to ensure natural alignment.");
+      return generatedSrc;
+    }
+
     const [imgOrig, imgGen] = await Promise.all([
       loadImage(originalSrc),
       loadImage(generatedSrc)
@@ -58,8 +66,6 @@ const applyDifferenceMask = async (originalSrc: string, generatedSrc: string, cu
     const len = origData.data.length;
     
     const isHairEdited = (currentState.selectedHairStyle.id !== 'original') || (currentState.selectedHairColor.id !== 'original');
-    const isBeardStyleChanged = currentState.selectedBeardStyle.id !== 'original';
-    const isBeardEdited = isBeardStyleChanged || (currentState.selectedBeardColor.id !== 'original');
 
     console.log("[MASK LOG] Blending image coordinates:", w, "x", h);
     console.log("[MASK LOG] isHairEdited:", isHairEdited, "isBeardEdited:", isBeardEdited, "isBeardStyleChanged:", isBeardStyleChanged);
