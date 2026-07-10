@@ -125,8 +125,9 @@ const applyDifferenceMask = async (originalSrc: string, generatedSrc: string, cu
         // leaving the mustache region below (0.55+) editable.
         const distFace = Math.max(Math.abs(nx - 0.5) / 0.20, Math.abs(ny - 0.44) / 0.10);
 
-        if (distFace < 1.0) {
-          // Smoothly scale threshold up to 999 at the center of eyes/nose/brows
+        if (distFace < 1.0 && ny < 0.50) {
+          // Smoothly scale threshold up to 999 at the center of eyes/nose/brows,
+          // but only for the upper face (above ny = 0.50) to prevent covering the cheeks/mustache.
           currentThreshold = Math.round(32 + (999 - 32) * (1.0 - distFace));
         } else if (distLips < 1.0) {
           // Smoothly scale threshold up to 999 at the center of the lips
