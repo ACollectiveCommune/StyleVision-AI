@@ -7,6 +7,7 @@ import { consumeCredit } from '../services/billingService';
 import { purchasePremium } from '../services/iapService';
 import { PaywallView } from './PaywallView';
 import { triggerAppStoreReview } from '../services/rateService';
+import { downloadOrShareImage } from '../services/shareService';
 
 const compressImageBase64 = (base64Str: string, maxDim: number = 360, quality: number = 0.5): Promise<string> => {
   return new Promise((resolve) => {
@@ -200,14 +201,9 @@ export const PhotoEditor: React.FC<PhotoEditorProps> = ({ uid, appState, onUpdat
     }
   };
 
-  const downloadImage = () => {
+  const downloadImage = async () => {
     if (appState.currentImage) {
-      const link = document.createElement('a');
-      link.href = appState.currentImage;
-      link.download = `StyleVision_${Date.now()}.jpg`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
+      await downloadOrShareImage(appState.currentImage);
     }
   };
 
