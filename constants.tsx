@@ -83,6 +83,12 @@ const BeardPaths: Record<string, string> = {
   medium: "M28,52 Q28,100 50,105 Q72,100 72,52 L72,48 Q72,110 50,115 Q28,110 28,48 Z",
   long: "M28,52 Q30,120 50,125 Q70,120 72,52 L72,48 Q75,130 50,135 Q25,130 28,48 Z",
   full: "M28,48 Q25,100 50,105 Q75,100 72,48 L72,45 Q50,55 28,45 Z", // Covers cheek
+  vandyke: "M40,72 Q50,68 60,72 Q50,76 40,72 M44,82 L44,92 Q50,97 56,92 L56,82 Z",
+  balbo: "M40,72 Q50,68 60,72 Q50,76 40,72 M38,90 L38,94 Q50,98 62,94 L62,90 Q50,88 38,90 Z",
+  ducktail: "M28,48 Q25,95 50,118 Q75,95 72,48 L72,45 Q50,55 28,45 Z",
+  anchor: "M40,72 Q50,68 60,72 Q50,76 40,72 M35,90 Q50,95 65,90 L65,92 Q50,100 35,92 Z",
+  muttonchops: "M28,45 L36,45 L36,75 Q28,70 28,45 M72,45 L64,45 L64,75 Q72,70 72,45",
+  bandholz: "M28,48 Q25,130 50,140 Q75,130 72,48 L72,45 Q50,55 28,45 Z",
 };
 
 export const StyleIllustration = ({ id, type }: { id: string, type: 'hair' | 'beard' }) => {
@@ -160,17 +166,23 @@ export const HAIR_STYLES_FEMALE: StyleOption[] = [
   { id: 'updo', label: 'Updo / Bun', category: 'hair', type: 'style' },
 ];
 
-export const BEARD_STYLES: StyleOption[] = [
+  export const BEARD_STYLES: StyleOption[] = [
   { id: 'original', label: 'Original', category: 'beard', type: 'style' },
   { id: 'none', label: 'Clean Shaven', category: 'beard', type: 'style' },
-  { id: 'chinstrap', label: 'Chin Strap', category: 'beard', type: 'style' },
-  { id: 'full', label: 'Full Beard', category: 'beard', type: 'style' },
-  { id: 'goatee', label: 'Goatee', category: 'beard', type: 'style' },
-  { id: 'long', label: 'Long Beard', category: 'beard', type: 'style' },
-  { id: 'medium', label: 'Medium Beard', category: 'beard', type: 'style' },
-  { id: 'mustache', label: 'Mustache', category: 'beard', type: 'style' },
-  { id: 'short', label: 'Short Beard', category: 'beard', type: 'style' },
   { id: 'stubble', label: 'Stubble', category: 'beard', type: 'style' },
+  { id: 'mustache', label: 'Mustache', category: 'beard', type: 'style' },
+  { id: 'goatee', label: 'Goatee', category: 'beard', type: 'style' },
+  { id: 'vandyke', label: 'Van Dyke', category: 'beard', type: 'style' },
+  { id: 'balbo', label: 'Balbo', category: 'beard', type: 'style' },
+  { id: 'ducktail', label: 'Ducktail', category: 'beard', type: 'style' },
+  { id: 'anchor', label: 'Anchor', category: 'beard', type: 'style' },
+  { id: 'chinstrap', label: 'Chin Strap', category: 'beard', type: 'style' },
+  { id: 'muttonchops', label: 'Mutton Chops', category: 'beard', type: 'style' },
+  { id: 'short', label: 'Short Beard', category: 'beard', type: 'style' },
+  { id: 'medium', label: 'Medium Beard', category: 'beard', type: 'style' },
+  { id: 'long', label: 'Long Beard', category: 'beard', type: 'style' },
+  { id: 'full', label: 'Full Beard', category: 'beard', type: 'style' },
+  { id: 'bandholz', label: 'Bandholz', category: 'beard', type: 'style' },
 ];
 
 export const HAIR_COLORS: StyleOption[] = [

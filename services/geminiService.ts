@@ -212,11 +212,17 @@ const STYLE_PROMPTS: Record<string, string> = {
   stubble: "light 3-day stubble facial hair along the jawline, chin, and upper lip",
   mustache: "thick classic mustache on the upper lip, with completely clean-shaven cheeks, jaw, and chin (absolutely no beard)",
   goatee: "a classic goatee beard consisting of hair only on the chin and a mustache forming a circle around the mouth, with completely clean-shaven cheeks and jawline (no hair on the sides of the face)",
+  vandyke: "classic Van Dyke beard, consisting of a short pointed chin goatee and a separate classic mustache, with completely clean-shaven cheeks and jawline",
+  balbo: "classic Balbo beard, consisting of a mustache, a wide chin beard, and a soul patch resembling an inverted T, with completely clean-shaven cheeks and sideburns",
+  ducktail: "neatly trimmed full beard that tapers down to a sharp point at the chin, resembling a ducktail shape",
+  anchor: "anchor-shaped beard, combining a thin mustache, a soul patch, and a thin chin strap along the jawline forming an anchor shape",
   chinstrap: "thin chinstrap beard running along the jawline from ear to ear, with clean-shaven cheeks and neck",
+  muttonchops: "classic mutton chops sideburns extending down the cheeks to the corners of the mouth, with a clean-shaven chin and upper lip",
   short: "short, neatly trimmed full beard including mustache, cheeks, and chin",
   medium: "medium-length full beard covering the cheeks, chin, and mustache",
   long: "long, full bushy beard (lumberjack style) covering the chin, cheeks, and mustache",
   full: "thick full beard covering the cheeks, chin, and mustache",
+  bandholz: "very long, full, natural-growing Bandholz beard with a thick, naturally styled mustache, flowing freely down without sharp edges",
 };
 
 // Detailed Color Prompt Mappings
