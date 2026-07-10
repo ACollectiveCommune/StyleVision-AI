@@ -57,6 +57,16 @@ const applyDifferenceMask = async (originalSrc: string, generatedSrc: string, cu
 
     const len = origData.data.length;
     
+    const isHairEdited = !!((currentState.selectedHairStyle && currentState.selectedHairStyle.id !== 'original') ||
+                           (currentState.selectedHairColor && currentState.selectedHairColor.id !== 'original'));
+    const isBeardEdited = !!((currentState.selectedBeardStyle && currentState.selectedBeardStyle.id !== 'original') ||
+                            (currentState.selectedBeardColor && currentState.selectedBeardColor.id !== 'original'));
+
+    console.log("[MASK LOG] Blending image coordinates:", w, "x", h);
+    console.log("[MASK LOG] isHairEdited:", isHairEdited, "isBeardEdited:", isBeardEdited);
+    console.log("[MASK LOG] Selected style:", currentState.selectedHairStyle?.id, "/", currentState.selectedBeardStyle?.id);
+    console.log("[MASK LOG] Selected color:", currentState.selectedHairColor?.id, "/", currentState.selectedBeardColor?.id);
+
     // We use a lower threshold of 32 (with a feather of 8) so that AI-generated shifts/shadows
     // are cleanly applied without leaving "residue" outlines, while preserving high-contrast
     // micro-features (like eyebrows/eyes) perfectly.
@@ -78,15 +88,9 @@ const applyDifferenceMask = async (originalSrc: string, generatedSrc: string, cu
       const b2 = genData.data[i+2];
       const a2 = genData.data[i+3];
 
-      // Calculate spatial distance from the center of the face ellipse
       const dx = (x - cx) / rx;
       const dy = (y - cy) / ry;
-      const ellipseDistance = dx * dx + dy * dy; // <= 1.0 is inside face, > 1.0 is outside
-
-      const isHairEdited = (currentState.selectedHairStyle && currentState.selectedHairStyle.id !== 'original') ||
-                           (currentState.selectedHairColor && currentState.selectedHairColor.id !== 'original');
-      const isBeardEdited = (currentState.selectedBeardStyle && currentState.selectedBeardStyle.id !== 'original') ||
-                            (currentState.selectedBeardColor && currentState.selectedBeardColor.id !== 'original');
+      const ellipseDistance = dx * dx + dy * dy;
 
       const nx = x / w;
       const ny = y / h;
