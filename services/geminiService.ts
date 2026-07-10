@@ -145,12 +145,11 @@ const applyDifferenceMask = async (originalSrc: string, generatedSrc: string, cu
           // Beard is not edited: force preserve original facial hair/skin details
           currentThreshold = 999;
         } else if (isBeardRegion && isBeardEdited) {
-          // Beard IS edited:
-          // - If style changed (e.g. Clean shaven, Goatee, Mustache): set threshold to 0 to use 
-          //   the generated clean skin or style 100% without letting old stubble restore.
-          // - If only color changed on original style: use threshold 12 to dye brown hair white/blonde cleanly.
-          currentThreshold = isBeardStyleChanged ? 0 : 12;
-          currentFeather = isBeardStyleChanged ? 2 : 4;
+          // Beard IS edited: set threshold to 14 (with feather 4)
+          // to allow new style/color edits to pass through cleanly, while restoring
+          // the original skin pore details on unaltered cheeks/jaw to look 100% natural.
+          currentThreshold = 14;
+          currentFeather = 4;
         }
 
         if (colorDist < currentThreshold - currentFeather) {
@@ -332,6 +331,7 @@ export const generateStylePreview = async (
     3. NO HEAD SHIFTING: The head position, size, rotation, and angle must remain in the exact same pixel coordinates as the input photo. Do NOT shift, rotate, scale, or move the head. The eyes, nose, mouth, and chin must align perfectly.
     4. Do NOT smooth, blur, soften, or airbrush the skin. Keep all natural skin texture, visible pores, freckles, and natural skin details exactly as in the original image.
     5. Keep the eyebrows 100% identical to the original image in shape, thickness, position, and color.
+    6. PHOTOREALISTIC BEARD: Make sure the generated beard/mustache hair looks extremely natural and realistic. It must have visible, fine, individual hair strands that naturally feather into the skin. Avoid blocky, solid-painted, drawn-on, or artificial-looking facial hair shapes.
   `);
 
   const prompt = promptParts.join("\n");
@@ -371,6 +371,7 @@ export const generateStylePreview = async (
             - Accurately apply the requested style and color changes to the hair and beard.
             - If a style or color is marked "Do not change" or "Keep original", you must leave that specific feature untouched.
             - Ensure the colors selected for hair and beard match the prompt exactly (e.g. if blonde is selected, hair must be dyed golden blonde).
+            - NATURAL FACIAL HAIR TEXTURE: The generated beard and mustache must look like real, high-resolution facial hair. It must feature distinct, fine hair strands, natural shading, and soft feathering where the hair meets the skin. Do NOT generate solid-painted blocks of color, blur, or drawn-on cartoon lines.
             
             IDENTITY, FACE, & SPATIAL ALIGNMENT RULES:
             - NO HEAD SHIFTING: The head position, size, rotation, and angle must remain in the exact same pixel coordinates as the input photo. Do NOT shift, rotate, scale, or move the head. The eyes, eyebrows, nose, mouth, and chin must align perfectly.

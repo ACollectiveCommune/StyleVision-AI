@@ -210,6 +210,4 @@ export const BEARD_COLORS: StyleOption[] = [
   { id: 'red', label: 'Red', category: 'beard', type: 'color' },
   { id: 'grey', label: 'Grey', category: 'beard', type: 'color' },
   { id: 'white', label: 'White', category: 'beard', type: 'color' },
-  { id: 'grey_highlights', label: 'Salt & Pepper', category: 'beard', type: 'color' },
-  { id: 'blonde_highlights', label: 'Blonde Highlights', category: 'beard', type: 'color' },
 ];
