@@ -59,7 +59,7 @@ export const PaywallView: React.FC<PaywallViewProps> = ({ uid, onContinueFree, o
   };
 
   return (
-    <div id="paywall-view" className="absolute inset-0 z-[100] flex flex-col items-center justify-start p-6 bg-black overflow-y-auto no-scrollbar">
+    <div id="paywall-view" className="absolute inset-0 z-[100] flex flex-col items-center justify-start p-6 bg-black overflow-y-auto no-scrollbar pointer-events-auto">
       
       {/* Background Blurs */}
       <div className="absolute top-[-10%] left-[-15%] w-[70%] h-[40%] rounded-full bg-indigo-600/10 blur-[130px] pointer-events-none" />
