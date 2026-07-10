@@ -270,6 +270,7 @@ const App: React.FC = () => {
 
         {state.currentMode === AppMode.EDITOR && (
           <PhotoEditor 
+            uid={currentUser.uid}
             appState={state} 
             onUpdateState={updateState} 
             onTriggerAd={() => setShowAdModal(true)}

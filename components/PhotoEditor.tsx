@@ -41,12 +41,13 @@ const compressImageBase64 = (base64Str: string, maxDim: number = 360, quality: n
 };
 
 interface PhotoEditorProps {
+  uid: string;
   appState: AppState;
   onUpdateState: (updates: Partial<AppState>) => void;
   onTriggerAd?: () => void;
 }
 
-export const PhotoEditor: React.FC<PhotoEditorProps> = ({ appState, onUpdateState, onTriggerAd }) => {
+export const PhotoEditor: React.FC<PhotoEditorProps> = ({ uid, appState, onUpdateState, onTriggerAd }) => {
   const [showOriginal, setShowOriginal] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [isControlsVisible, setIsControlsVisible] = useState(true);
@@ -76,7 +77,7 @@ export const PhotoEditor: React.FC<PhotoEditorProps> = ({ appState, onUpdateStat
   const handleGenerate = useCallback(async () => {
     if (!appState.originalImage || appState.isProcessing) return;
     
-    const user = auth?.currentUser;
+    const user = uid ? { uid } : null;
 
     // Enforce credits check
     if (appState.credits <= 0) {
@@ -164,7 +165,7 @@ export const PhotoEditor: React.FC<PhotoEditorProps> = ({ appState, onUpdateStat
 
   // Toggle favorite helper
   const handleToggleFavorite = async () => {
-    const user = auth?.currentUser;
+    const user = uid ? { uid } : null;
     if (!user || !currentDocId || isSaving) return;
     try {
       const nextState = !isFavorited;
@@ -514,9 +515,9 @@ export const PhotoEditor: React.FC<PhotoEditorProps> = ({ appState, onUpdateStat
       )}
 
       {/* 5. Consumable Credits Shop Modal */}
-      {showUpgradeModal && auth?.currentUser && (
+      {showUpgradeModal && uid && (
         <PaywallView 
-          uid={auth.currentUser.uid}
+          uid={uid}
           onContinueFree={() => {
             setShowUpgradeModal(false);
           }}
