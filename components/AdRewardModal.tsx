@@ -139,9 +139,19 @@ export const AdRewardModal: React.FC<AdRewardModalProps> = ({ onAdCompleted, onC
               onClick={handleClaim}
               className="w-full py-3 rounded-2xl bg-yellow-500 hover:bg-yellow-400 text-black font-black text-xs uppercase tracking-widest transition-all active:scale-[0.98] shadow-lg shadow-yellow-500/20"
             >
-              Claim Reward
+              Claim Credit & Close
             </button>
           </div>
+        )}
+
+        {/* Skip/Cancel trigger during play */}
+        {!isAdFinished && (
+          <button
+            onClick={onClose}
+            className="text-[10px] font-extrabold uppercase tracking-widest text-neutral-500 hover:text-neutral-400 transition-colors pt-2"
+          >
+            Cancel Ad & Exit
+          </button>
         )}
 
       </div>
