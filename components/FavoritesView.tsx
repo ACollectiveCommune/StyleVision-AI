@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { auth, fetchUserFavorites, deleteGeneration, toggleFavorite, SavedGeneration } from '../services/firebase';
 import { Icons } from '../constants';
 import { AppState, AppMode, Gender } from '../types';
+import { downloadOrShareImage } from '../services/shareService';
 
 interface FavoritesViewProps {
   onLoadGeneration: (generation: SavedGeneration) => void;
@@ -59,14 +60,8 @@ export const FavoritesView: React.FC<FavoritesViewProps> = ({ onLoadGeneration }
     }
   };
 
-  const handleDownload = (imageUrl: string, filename: string) => {
-    const link = document.createElement('a');
-    link.href = imageUrl;
-    link.download = filename;
-    link.target = '_blank';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+  const handleDownload = async (imageUrl: string) => {
+    await downloadOrShareImage(imageUrl);
   };
 
   if (loading) {
@@ -172,7 +167,7 @@ export const FavoritesView: React.FC<FavoritesViewProps> = ({ onLoadGeneration }
                     Edit
                   </button>
                   <button
-                    onClick={() => handleDownload(item.generatedImageUrl, `StyleVision_${item.id}.jpg`)}
+                    onClick={() => handleDownload(item.generatedImageUrl)}
                     className="w-8 h-8 rounded-lg bg-neutral-900/90 border border-white/15 flex items-center justify-center text-white active:scale-95 transition-transform"
                   >
                     <Icons.Download />
