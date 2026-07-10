@@ -1,6 +1,6 @@
 import { Capacitor } from "@capacitor/core";
 import { db } from "./firebase";
-import { doc, updateDoc, setDoc } from "firebase/firestore";
+import { doc, setDoc } from "firebase/firestore";
 import { createCheckoutSession, createPortalSession } from "./billingService";
 
 // iOS Apple App Store Subscription Product ID
@@ -15,7 +15,7 @@ export const isIOS = (): boolean => {
 
 /**
  * Initializes the purchase store system on app startup.
- * - On iOS: Configures native App Store listeners and handles transaction verification.
+ * - On iOS: Configures native App Store listeners and handles transaction verification (using cordova-plugin-purchase v13+).
  * - On Web: No-op (falls back to Stripe web integration).
  */
 export const initializeBilling = (uid: string, onPremiumUpdate: (isPremium: boolean) => void) => {
@@ -24,24 +24,31 @@ export const initializeBilling = (uid: string, onPremiumUpdate: (isPremium: bool
     return;
   }
 
-  const store = (window as any).store;
+  const CdvPurchase = (window as any).CdvPurchase;
+  const store = CdvPurchase?.store;
   if (!store) {
-    console.error("[IAP LOG] cordova-plugin-purchase is not available on window. Make sure you are running on device/simulator.");
+    console.error("[IAP LOG] CdvPurchase.store is not available on window. Make sure you are running on device/simulator.");
     return;
   }
 
-  console.log("[IAP LOG] Initializing StoreKit Apple In-App Purchases...");
+  console.log("[IAP LOG] Initializing StoreKit Apple In-App Purchases (v13+ API)...");
 
-  // Register Monthly Subscription Product
-  store.register({
+  // 1. Register Monthly Subscription Product using v13+ registration signature
+  store.register([{
     id: APPLE_PREMIUM_PRODUCT_ID,
-    type: store.PAID_SUBSCRIPTION,
-  });
+    type: CdvPurchase.ProductType.PAID_SUBSCRIPTION,
+    platform: CdvPurchase.Platform.APPLE_APPSTORE,
+  }]);
 
-  // Track approved transactions (successfully purchased, needs validation/unlock)
-  store.when(APPLE_PREMIUM_PRODUCT_ID)
+  // 2. Set Up Event Listeners (approved -> verify -> verified -> finish)
+  store.when()
     .approved(async (transaction: any) => {
-      console.log(`[IAP LOG] Subscription approved! Unlocking premium status for user ${uid}...`);
+      console.log(`[IAP LOG] Purchase approved for transaction: ${transaction.transactionId}. Triggering verification...`);
+      // Start receipt verification
+      transaction.verify();
+    })
+    .verified(async (receipt: any) => {
+      console.log(`[IAP LOG] Purchase verified! Unlocking premium status for user ${uid}...`);
       
       // Update Firestore user document to unlock premium status
       if (db) {
@@ -50,7 +57,6 @@ export const initializeBilling = (uid: string, onPremiumUpdate: (isPremium: bool
           await setDoc(userDocRef, {
             isPremium: true,
             premiumSource: "apple_iap",
-            lastTransactionId: transaction.id,
             premiumUnlockedAt: new Date().toISOString()
           }, { merge: true });
           
@@ -64,38 +70,58 @@ export const initializeBilling = (uid: string, onPremiumUpdate: (isPremium: bool
         onPremiumUpdate(true);
       }
 
-      // Finish transaction to prevent Apple from retrying/refunding the purchase
-      transaction.finish();
+      // Finish transaction to prevent Apple from refunding/retrying
+      receipt.finish();
+    })
+    .finished((transaction: any) => {
+      console.log("[IAP LOG] StoreKit transaction finished successfully:", transaction.transactionId);
     });
 
-  // Track transaction error states
-  store.when(APPLE_PREMIUM_PRODUCT_ID)
-    .error((error: any) => {
-      console.error("[IAP LOG] StoreKit transaction error:", error);
-    });
+  // Track global store error events
+  store.error((error: any) => {
+    console.error("[IAP LOG] StoreKit global error:", error);
+  });
 
-  // Refresh StoreKit products and fetch pricing information
-  store.refresh();
+  // 3. Initialize connection to StoreKit
+  try {
+    store.initialize([CdvPurchase.Platform.APPLE_APPSTORE]);
+    console.log("[IAP LOG] Store initialized successfully.");
+  } catch (initErr) {
+    console.error("[IAP LOG] Failed to initialize store:", initErr);
+  }
 };
 
 /**
  * Initiates the premium subscription process.
- * - On iOS: Opens the native StoreKit payment sheet.
+ * - On iOS: Opens the native StoreKit payment sheet (using cordova-plugin-purchase v13+).
  * - On Web: Redirects to Stripe Checkout.
  */
 export const purchasePremium = async (uid: string): Promise<string | null> => {
   if (isIOS()) {
-    const store = (window as any).store;
+    const CdvPurchase = (window as any).CdvPurchase;
+    const store = CdvPurchase?.store;
     if (!store) {
       throw new Error("StoreKit plugin is not loaded on this platform.");
     }
 
     console.log(`[IAP LOG] Ordering product: ${APPLE_PREMIUM_PRODUCT_ID}`);
     
-    // Order the product. StoreKit will prompt Apple ID verification.
-    store.order(APPLE_PREMIUM_PRODUCT_ID);
+    // Fetch product information registered in store
+    const product = store.get(APPLE_PREMIUM_PRODUCT_ID);
+    if (!product) {
+      throw new Error(`Product ${APPLE_PREMIUM_PRODUCT_ID} not found in StoreKit registries. Please check your App Store Connect configurations.`);
+    }
+
+    // Fetch the product offer to order (standard in v13+)
+    const offer = product.getOffer();
+    if (offer) {
+      console.log("[IAP LOG] Found active offer. Initiating purchase order...");
+      await store.order(offer);
+    } else {
+      console.log("[IAP LOG] No offer found. Attempting direct product purchase...");
+      await store.order(product);
+    }
     
-    // Return null since navigation/checkout handles asynchronously natively
     return null;
   } else {
     // Web fallback to Stripe Checkout
