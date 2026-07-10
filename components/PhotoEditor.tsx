@@ -444,14 +444,14 @@ export const PhotoEditor: React.FC<PhotoEditorProps> = ({ appState, onUpdateStat
         </div>
       ) : (
         /* Button to bring back controls (if they were somehow closed) */
-        <div className="absolute bottom-28 left-0 right-0 z-40 flex justify-center pointer-events-none animate-in fade-in duration-500">
+        <div className="absolute bottom-36 left-0 right-0 z-40 flex justify-center pointer-events-none animate-in fade-in duration-500">
            <button
              type="button"
              onClick={() => setIsControlsVisible(true)}
-             className="pointer-events-auto px-5 py-2.5 rounded-full bg-black/40 backdrop-blur-md border border-white/20 text-white shadow-xl flex items-center gap-2 active:scale-95 transition-all"
+             className="pointer-events-auto px-4 py-1.5 rounded-full bg-black/55 backdrop-blur-xl border border-white/10 text-white/95 shadow-[0_4px_16px_rgba(0,0,0,0.3)] flex items-center gap-1.5 active:scale-95 transition-all"
            >
-             <Icons.Styles />
-             <span className="text-xs font-bold uppercase tracking-wider">Edit Style</span>
+             <Icons.Styles className="w-3.5 h-3.5" />
+             <span className="text-[10px] font-extrabold uppercase tracking-widest">Edit Style</span>
            </button>
         </div>
       )}
