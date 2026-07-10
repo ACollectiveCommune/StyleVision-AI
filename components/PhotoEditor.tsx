@@ -3,7 +3,8 @@ import { AppState, StyleOption, Gender } from '../types';
 import { Icons, HAIR_STYLES_MALE, HAIR_STYLES_FEMALE, BEARD_STYLES, HAIR_COLORS, BEARD_COLORS, StyleIllustration } from '../constants';
 import { generateStylePreview } from '../services/geminiService';
 import { auth, saveGeneration, uploadImageToStorage, toggleFavorite } from '../services/firebase';
-import { createCheckoutSession, incrementGenerationCount } from '../services/billingService';
+import { incrementGenerationCount } from '../services/billingService';
+import { purchasePremium } from '../services/iapService';
 
 const compressImageBase64 = (base64Str: string, maxDim: number = 360, quality: number = 0.5): Promise<string> => {
   return new Promise((resolve) => {
@@ -549,11 +550,13 @@ export const PhotoEditor: React.FC<PhotoEditorProps> = ({ appState, onUpdateStat
                     setIsUpgrading(true);
                     setUpgradeError(null);
                     try {
-                      const checkoutUrl = await createCheckoutSession(auth.currentUser!.uid);
-                      window.location.href = checkoutUrl;
+                      const checkoutUrl = await purchasePremium(auth.currentUser!.uid);
+                      if (checkoutUrl) {
+                        window.location.href = checkoutUrl;
+                      }
                     } catch (err: any) {
                       console.error("Upgrade checkout failed:", err);
-                      setUpgradeError(err.message || "Failed to initiate Stripe Checkout.");
+                      setUpgradeError(err.message || "Failed to initiate premium checkout.");
                     } finally {
                       setIsUpgrading(false);
                     }
@@ -564,7 +567,7 @@ export const PhotoEditor: React.FC<PhotoEditorProps> = ({ appState, onUpdateStat
                   {isUpgrading ? (
                     <>
                       <div className="animate-spin rounded-full h-3.5 w-3.5 border-b-2 border-white"></div>
-                      <span>Redirecting to Stripe...</span>
+                      <span>Connecting...</span>
                     </>
                   ) : (
                     <span>Subscribe - $9.99 / mo</span>

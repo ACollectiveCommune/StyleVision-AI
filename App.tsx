@@ -7,7 +7,8 @@ import { LoginView } from './components/LoginView';
 import { FavoritesView } from './components/FavoritesView';
 import { Icons, HAIR_STYLES_MALE, HAIR_STYLES_FEMALE, HAIR_COLORS, BEARD_STYLES, BEARD_COLORS } from './constants';
 import { auth, logout, onAuthStateChanged, SavedGeneration } from './services/firebase';
-import { subscribeToSubscription, getGenerationCount, createPortalSession } from './services/billingService';
+import { subscribeToSubscription, getGenerationCount } from './services/billingService';
+import { initializeBilling, purchasePremium, manageBillingSubscription } from './services/iapService';
 import { User } from 'firebase/auth';
 
 const App: React.FC = () => {
@@ -66,6 +67,11 @@ const App: React.FC = () => {
             });
           });
           billingUnsubscribeRef.current = unsubBilling;
+
+          // Initialize native Apple App Store billing listeners (on iOS)
+          initializeBilling(user.uid, (isPremium) => {
+            updateState({ isPremium, premiumChecked: true });
+          });
         } catch (err) {
           console.error("Error setting up user billing data:", err);
           updateState({
@@ -101,8 +107,10 @@ const App: React.FC = () => {
     if (!currentUser) return;
     setIsHeaderUpgrading(true);
     try {
-      const checkoutUrl = await createCheckoutSession(currentUser.uid);
-      window.location.href = checkoutUrl;
+      const checkoutUrl = await purchasePremium(currentUser.uid);
+      if (checkoutUrl) {
+        window.location.href = checkoutUrl;
+      }
     } catch (err: any) {
       console.error("Header upgrade failed:", err);
       alert(err.message || "Could not initiate premium checkout.");
@@ -115,11 +123,13 @@ const App: React.FC = () => {
     if (!currentUser) return;
     setIsBillingPortalLoading(true);
     try {
-      const portalUrl = await createPortalSession(currentUser.uid);
-      window.location.href = portalUrl;
+      const portalUrl = await manageBillingSubscription(currentUser.uid);
+      if (portalUrl) {
+        window.location.href = portalUrl;
+      }
     } catch (err: any) {
       console.error("Portal redirect failed:", err);
-      alert(err.message || "Could not launch Stripe billing portal.");
+      alert(err.message || "Could not launch billing portal.");
     } finally {
       setIsBillingPortalLoading(false);
     }
@@ -398,8 +408,10 @@ const App: React.FC = () => {
                   onClick={async () => {
                     setShowAccountModal(false);
                     try {
-                      const url = await createCheckoutSession(currentUser!.uid);
-                      window.location.href = url;
+                      const url = await purchasePremium(currentUser!.uid);
+                      if (url) {
+                        window.location.href = url;
+                      }
                     } catch (err: any) {
                       alert(err.message || "Failed to start premium upgrade.");
                     }
