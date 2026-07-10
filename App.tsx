@@ -85,11 +85,11 @@ const App: React.FC = () => {
     }
   };
 
-  const toggleGender = () => {
-    const nextGender = state.gender === Gender.MALE ? Gender.FEMALE : Gender.MALE;
-    const hairStylesList = nextGender === Gender.MALE ? HAIR_STYLES_MALE : HAIR_STYLES_FEMALE;
+  const setGender = (targetGender: Gender) => {
+    if (state.gender === targetGender) return;
+    const hairStylesList = targetGender === Gender.MALE ? HAIR_STYLES_MALE : HAIR_STYLES_FEMALE;
     updateState({ 
-      gender: nextGender,
+      gender: targetGender,
       selectedHairStyle: hairStylesList[0],
       selectedHairColor: HAIR_COLORS[0],
       selectedBeardStyle: BEARD_STYLES[0],
@@ -155,18 +155,21 @@ const App: React.FC = () => {
         {/* Controls: Gender & Album */}
         <div className="flex items-center gap-3">
           
-          {/* Gender Toggle Pill */}
-          <button 
-            onClick={toggleGender}
-            className="flex items-center bg-black/40 backdrop-blur-xl rounded-full p-0.5 border border-white/10 shadow-lg"
-          >
-            <div className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider transition-all duration-300 ${state.gender === Gender.MALE ? 'bg-white/10 text-white shadow-sm' : 'text-white/40'}`}>
+          {/* Gender Selector Segmented Control */}
+          <div className="flex items-center bg-black/40 backdrop-blur-xl rounded-full p-0.5 border border-white/10 shadow-lg">
+            <button 
+              onClick={() => setGender(Gender.MALE)}
+              className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider transition-all duration-300 active:scale-95 ${state.gender === Gender.MALE ? 'bg-white/10 text-white shadow-sm font-extrabold' : 'text-white/40'}`}
+            >
               Male
-            </div>
-            <div className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider transition-all duration-300 ${state.gender === Gender.FEMALE ? 'bg-white/10 text-white shadow-sm' : 'text-white/40'}`}>
+            </button>
+            <button 
+              onClick={() => setGender(Gender.FEMALE)}
+              className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider transition-all duration-300 active:scale-95 ${state.gender === Gender.FEMALE ? 'bg-white/10 text-white shadow-sm font-extrabold' : 'text-white/40'}`}
+            >
               Female
-            </div>
-          </button>
+            </button>
+          </div>
 
           {/* Album Picker */}
           <button 
