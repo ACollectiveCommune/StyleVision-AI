@@ -145,11 +145,11 @@ const applyDifferenceMask = async (originalSrc: string, generatedSrc: string, cu
           // Beard is not edited: force preserve original facial hair/skin details
           currentThreshold = 999;
         } else if (isBeardRegion && isBeardEdited) {
-          // Beard IS edited: set threshold to 14 (with feather 4)
-          // to allow new style/color edits to pass through cleanly, while restoring
-          // the original skin pore details on unaltered cheeks/jaw to look 100% natural.
-          currentThreshold = 14;
-          currentFeather = 4;
+          // Beard IS edited: set threshold to 0 to let the generated style/color
+          // edits pass through 100% without any original stubble restoration, 
+          // allowing the color to flow seamlessly from sideburns onto cheeks and mustache.
+          currentThreshold = 0;
+          currentFeather = 1;
         }
 
         if (colorDist < currentThreshold - currentFeather) {
