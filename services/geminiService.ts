@@ -21,15 +21,14 @@ const loadImage = (src: string): Promise<HTMLImageElement> => {
   });
 };
 
-// Client-side Pixel-by-Pixel difference restorer with spatial face-masking
 const applyDifferenceMask = async (originalSrc: string, generatedSrc: string, currentState: AppState): Promise<string> => {
   try {
+    const isHairEdited = currentState.selectedHairStyle.id !== 'original' || currentState.selectedHairColor.id !== 'original';
     const isBeardStyleChanged = currentState.selectedBeardStyle.id !== 'original';
-    const isBeardEdited = isBeardStyleChanged || (currentState.selectedBeardColor.id !== 'original');
-    const isFemaleHairTryOn = currentState.gender === Gender.FEMALE && currentState.selectedHairStyle.id !== 'original';
+    const isBeardEdited = isBeardStyleChanged || currentState.selectedBeardColor.id !== 'original';
 
-    if (isBeardEdited || isFemaleHairTryOn) {
-      console.log("[MASK LOG] Beard is edited or Female hair try-on active. Bypassing difference mask to ensure natural chin/jaw alignment.");
+    if (isHairEdited || isBeardEdited) {
+      console.log("[MASK LOG] Hair or Beard is edited. Bypassing difference mask to ensure maximum realism and seamless blending.");
       return generatedSrc;
     }
 
@@ -63,11 +62,7 @@ const applyDifferenceMask = async (originalSrc: string, generatedSrc: string, cu
     const cy = h * 0.52;
     const rx = w * 0.22; // Horizontal radius (covers eyes, eyebrows, cheeks, nose, mouth)
     const ry = h * 0.22; // Vertical radius (covers forehead to chin)
-
     const len = origData.data.length;
-    
-    const isHairEdited = (currentState.selectedHairStyle.id !== 'original') || (currentState.selectedHairColor.id !== 'original');
-
     console.log("[MASK LOG] Blending image coordinates:", w, "x", h);
     console.log("[MASK LOG] isHairEdited:", isHairEdited, "isBeardEdited:", isBeardEdited, "isBeardStyleChanged:", isBeardStyleChanged);
     console.log("[MASK LOG] Selected style:", currentState.selectedHairStyle?.id, "/", currentState.selectedBeardStyle?.id);
