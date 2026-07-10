@@ -121,10 +121,16 @@ const App: React.FC = () => {
     setShowAdModal(false);
     if (currentUser) {
       try {
-        await incrementUserCredits(currentUser.uid, 1);
+        const newCredits = await incrementUserCredits(currentUser.uid, 1);
+        updateState({ credits: newCredits, isPremium: newCredits > 0 });
       } catch (err) {
         console.error("Failed to grant ad credit:", err);
+        const fallbackCredits = state.credits + 1;
+        updateState({ credits: fallbackCredits, isPremium: fallbackCredits > 0 });
       }
+    } else {
+      const fallbackCredits = state.credits + 1;
+      updateState({ credits: fallbackCredits, isPremium: fallbackCredits > 0 });
     }
   };
 
