@@ -3,8 +3,9 @@ import { AppState, StyleOption, Gender, AppMode } from '../types';
 import { Icons, HAIR_STYLES_MALE, HAIR_STYLES_FEMALE, BEARD_STYLES, HAIR_COLORS, BEARD_COLORS, StyleIllustration } from '../constants';
 import { generateStylePreview } from '../services/geminiService';
 import { auth, saveGeneration, uploadImageToStorage, toggleFavorite } from '../services/firebase';
-import { incrementGenerationCount } from '../services/billingService';
+import { consumeCredit } from '../services/billingService';
 import { purchasePremium } from '../services/iapService';
+import { PaywallView } from './PaywallView';
 
 const compressImageBase64 = (base64Str: string, maxDim: number = 360, quality: number = 0.5): Promise<string> => {
   return new Promise((resolve) => {
@@ -42,9 +43,10 @@ const compressImageBase64 = (base64Str: string, maxDim: number = 360, quality: n
 interface PhotoEditorProps {
   appState: AppState;
   onUpdateState: (updates: Partial<AppState>) => void;
+  onTriggerAd?: () => void;
 }
 
-export const PhotoEditor: React.FC<PhotoEditorProps> = ({ appState, onUpdateState }) => {
+export const PhotoEditor: React.FC<PhotoEditorProps> = ({ appState, onUpdateState, onTriggerAd }) => {
   const [showOriginal, setShowOriginal] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [isControlsVisible, setIsControlsVisible] = useState(true);
@@ -76,8 +78,8 @@ export const PhotoEditor: React.FC<PhotoEditorProps> = ({ appState, onUpdateStat
     
     const user = auth?.currentUser;
 
-    // Enforce 3 Free Trial Generations limit for non-premium users
-    if (!appState.isPremium && appState.generationCount >= 3) {
+    // Enforce credits check
+    if (appState.credits <= 0) {
       setShowUpgradeModal(true);
       return;
     }
@@ -93,22 +95,23 @@ export const PhotoEditor: React.FC<PhotoEditorProps> = ({ appState, onUpdateStat
       const newImage = await generateStylePreview(appState);
       
       if (requestId === latestRequestId.current) {
-        // Increment generation count in Firestore/locally
-        let nextGenCount = appState.generationCount;
+        // Consume credit in Firestore/locally
+        let nextCredits = appState.credits;
         if (user) {
           try {
-            nextGenCount = await incrementGenerationCount(user.uid);
+            nextCredits = await consumeCredit(user.uid);
           } catch (countErr) {
-            console.error("Failed to increment generation count:", countErr);
+            console.error("Failed to consume credit:", countErr);
+            nextCredits = Math.max(0, appState.credits - 1);
           }
         } else {
-          nextGenCount += 1;
+          nextCredits = Math.max(0, appState.credits - 1);
         }
 
         onUpdateState({ 
           currentImage: newImage, 
           isProcessing: false, 
-          generationCount: nextGenCount 
+          credits: nextCredits
         });
         setIsControlsVisible(true); // Restore controls on success
         
@@ -286,16 +289,18 @@ export const PhotoEditor: React.FC<PhotoEditorProps> = ({ appState, onUpdateStat
             <div className="w-12 h-1 bg-white/20 rounded-full group-hover:bg-white/40 transition-colors"></div>
           </div>
 
-          {/* Persistent Upgrade Banner for Free Users */}
-          {!appState.isPremium && (
+          {/* Persistent Credit Top-Up Banner */}
+          {appState.credits <= 10 && (
             <div className="px-4 py-2.5 mx-4 my-1.5 rounded-2xl bg-gradient-to-r from-indigo-500/20 to-purple-500/20 border border-indigo-500/30 flex justify-between items-center shadow-lg">
               <div className="flex items-center gap-2 text-left">
                 <div className="w-6 h-6 rounded-lg bg-indigo-500/20 flex items-center justify-center text-indigo-400 flex-shrink-0">
                   <Icons.Magic className="w-3.5 h-3.5" />
                 </div>
                 <div className="flex flex-col">
-                  <span className="text-[10px] font-extrabold uppercase tracking-wider text-white">StyleVision Pro</span>
-                  <span className="text-[9px] text-neutral-400 font-bold leading-none mt-0.5">{appState.generationCount}/3 Free attempts used</span>
+                  <span className="text-[10px] font-extrabold uppercase tracking-wider text-white">Credit Store</span>
+                  <span className="text-[9px] text-neutral-400 font-bold leading-none mt-0.5">
+                    {appState.credits === 0 ? "No credits remaining" : `${appState.credits} credits remaining`}
+                  </span>
                 </div>
               </div>
               <button
@@ -303,7 +308,7 @@ export const PhotoEditor: React.FC<PhotoEditorProps> = ({ appState, onUpdateStat
                 onClick={() => setShowUpgradeModal(true)}
                 className="px-3 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-[9px] font-extrabold uppercase tracking-widest text-white shadow-sm active:scale-95 transition-transform"
               >
-                Go Pro
+                Top Up
               </button>
             </div>
           )}
@@ -507,124 +512,20 @@ export const PhotoEditor: React.FC<PhotoEditorProps> = ({ appState, onUpdateStat
         </div>
       )}
 
-      {/* 5. Stripe Premium Upgrade Modal */}
-      {showUpgradeModal && (
-        <div className="absolute inset-0 bg-black/80 backdrop-blur-md z-50 flex items-center justify-center p-6 animate-in fade-in duration-300 pointer-events-auto">
-          <div className="bg-neutral-900 border border-white/10 rounded-3xl p-6 w-full max-w-sm flex flex-col space-y-6 shadow-2xl relative animate-in zoom-in-95 duration-300">
-            {/* Close button */}
-            <button
-              type="button"
-              onClick={() => {
-                setShowUpgradeModal(false);
-                setUpgradeError(null);
-              }}
-              className="absolute right-4 top-4 text-white/40 hover:text-white active:scale-90 transition-transform"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                <line x1="18" y1="6" x2="6" y2="18"></line>
-                <line x1="6" y1="6" x2="18" y2="18"></line>
-              </svg>
-            </button>
-
-            {/* Icon & Title */}
-            <div className="flex flex-col items-center text-center space-y-2">
-              <div className="w-14 h-14 rounded-2xl bg-indigo-600/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400">
-                <Icons.Magic className="w-6 h-6" />
-              </div>
-              <h3 className="text-lg font-extrabold uppercase tracking-widest text-white mt-2">Unlock Premium</h3>
-              <p className="text-xs text-neutral-400 leading-relaxed px-2">
-                You've reached your free trial limit of 3 styling attempts. Upgrade to premium for unlimited transformations!
-              </p>
-            </div>
-
-            {/* Features List */}
-            <div className="bg-white/5 rounded-2xl p-4 border border-white/5 space-y-3">
-              {[
-                "Unlimited AI generation request quota",
-                "Lock in priority queue rendering speeds",
-                "Access premium custom styles & prompt engine",
-                "Save unlimited hair & beard configurations"
-              ].map((feature, idx) => (
-                <div key={idx} className="flex items-center gap-3">
-                  <div className="w-4 h-4 rounded-full bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center flex-shrink-0 text-emerald-400">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-                      <polyline points="20 6 9 17 4 12"></polyline>
-                    </svg>
-                  </div>
-                  <span className="text-[11px] font-medium text-neutral-300">{feature}</span>
-                </div>
-              ))}
-            </div>
-
-            {/* Error Message */}
-            {upgradeError && (
-              <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-3 text-center text-[10px] font-bold tracking-wide text-red-400">
-                {upgradeError}
-              </div>
-            )}
-
-            {/* Upgrade CTA */}
-            <div className="flex flex-col space-y-3 pt-2">
-              {auth?.currentUser ? (
-                <button
-                  type="button"
-                  onClick={async () => {
-                    setIsUpgrading(true);
-                    setUpgradeError(null);
-                    try {
-                      const checkoutUrl = await purchasePremium(auth.currentUser!.uid);
-                      if (checkoutUrl) {
-                        window.location.href = checkoutUrl;
-                      }
-                    } catch (err: any) {
-                      console.error("Upgrade checkout failed:", err);
-                      setUpgradeError(err.message || "Failed to initiate premium checkout.");
-                    } finally {
-                      setIsUpgrading(false);
-                    }
-                  }}
-                  disabled={isUpgrading}
-                  className="w-full py-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 font-extrabold text-[10px] uppercase tracking-widest text-white transition-all active:scale-[0.98] flex items-center justify-center gap-2 shadow-lg shadow-indigo-600/25"
-                >
-                  {isUpgrading ? (
-                    <>
-                      <div className="animate-spin rounded-full h-3.5 w-3.5 border-b-2 border-white"></div>
-                      <span>Connecting...</span>
-                    </>
-                  ) : (
-                    <span>Subscribe - $9.99 / mo</span>
-                  )}
-                </button>
-              ) : (
-                <div className="text-center space-y-2">
-                  <p className="text-[10px] text-neutral-400 font-bold uppercase tracking-wider">Please sign in to upgrade</p>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setShowUpgradeModal(false);
-                      // Switch to Camera mode to trigger the login overlay
-                      onUpdateState({ currentMode: AppMode.CAMERA });
-                    }}
-                    className="w-full py-3 rounded-xl bg-neutral-800 hover:bg-neutral-700 font-extrabold text-[10px] uppercase tracking-widest text-white transition-all active:scale-[0.98]"
-                  >
-                    Go to Sign In
-                  </button>
-                </div>
-              )}
-              
-              <button
-                type="button"
-                onClick={() => {
-                  setShowUpgradeModal(false);
-                  setUpgradeError(null);
-                }}
-                className="text-center text-[10px] font-bold uppercase tracking-wider text-neutral-500 hover:text-neutral-400 py-1"
-              >
-                Maybe Later
-              </button>
-            </div>
-          </div>
-        </div>
+      {/* 5. Consumable Credits Shop Modal */}
+      {showUpgradeModal && auth?.currentUser && (
+        <PaywallView 
+          uid={auth.currentUser.uid}
+          onContinueFree={() => {
+            setShowUpgradeModal(false);
+          }}
+          onWatchAdClick={() => {
+            setShowUpgradeModal(false);
+            if (onTriggerAd) {
+              onTriggerAd();
+            }
+          }}
+        />
       )}
 
     </div>

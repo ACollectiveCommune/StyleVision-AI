@@ -8,8 +8,9 @@ import { FavoritesView } from './components/FavoritesView';
 import { PaywallView } from './components/PaywallView';
 import { Icons, HAIR_STYLES_MALE, HAIR_STYLES_FEMALE, HAIR_COLORS, BEARD_STYLES, BEARD_COLORS } from './constants';
 import { auth, logout, onAuthStateChanged, SavedGeneration } from './services/firebase';
-import { subscribeToSubscription, getGenerationCount } from './services/billingService';
+import { subscribeToCredits, incrementUserCredits } from './services/billingService';
 import { initializeBilling, purchasePremium, manageBillingSubscription } from './services/iapService';
+import { AdRewardModal } from './components/AdRewardModal';
 import { User } from 'firebase/auth';
 
 const App: React.FC = () => {
@@ -29,12 +30,14 @@ const App: React.FC = () => {
     isPremium: false,
     premiumChecked: false,
     generationCount: 0,
+    credits: 5,
   });
 
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [authChecked, setAuthChecked] = useState(false);
   const [isAuthenticating, setIsAuthenticating] = useState(false);
   const [showOnboardingPaywall, setShowOnboardingPaywall] = useState(false);
+  const [showAdModal, setShowAdModal] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -58,27 +61,26 @@ const App: React.FC = () => {
 
       if (user) {
         try {
-          const genCount = await getGenerationCount(user.uid);
-          
-          // Listen to active subscription status
-          const unsubBilling = subscribeToSubscription(user.uid, (isPremium) => {
+          // Listen to active credits balance
+          const unsubBilling = subscribeToCredits(user.uid, (credits) => {
             updateState({
-              isPremium,
+              credits,
+              isPremium: credits > 0,
               premiumChecked: true,
-              generationCount: genCount
+              generationCount: 5 - credits
             });
-            if (isPremium) {
-              setShowOnboardingPaywall(false);
-            } else {
+            if (credits === 0) {
               setShowOnboardingPaywall(true);
+            } else {
+              setShowOnboardingPaywall(false);
             }
           });
           billingUnsubscribeRef.current = unsubBilling;
 
           // Initialize native Apple App Store billing listeners (on iOS)
-          initializeBilling(user.uid, (isPremium) => {
-            updateState({ isPremium, premiumChecked: true });
-            if (isPremium) {
+          initializeBilling(user.uid, (newCredits) => {
+            updateState({ credits: newCredits, isPremium: newCredits > 0 });
+            if (newCredits > 0) {
               setShowOnboardingPaywall(false);
             }
           });
@@ -87,14 +89,16 @@ const App: React.FC = () => {
           updateState({
             isPremium: false,
             premiumChecked: true,
-            generationCount: 0
+            generationCount: 0,
+            credits: 0
           });
         }
       } else {
         updateState({
           isPremium: false,
           premiumChecked: true,
-          generationCount: 0
+          generationCount: 0,
+          credits: 0
         });
         setShowOnboardingPaywall(false);
       }
@@ -110,23 +114,17 @@ const App: React.FC = () => {
     };
   }, []);
 
-  const [isHeaderUpgrading, setIsHeaderUpgrading] = useState(false);
   const [showAccountModal, setShowAccountModal] = useState(false);
   const [isBillingPortalLoading, setIsBillingPortalLoading] = useState(false);
 
-  const handleUpgradeFromHeader = async () => {
-    if (!currentUser) return;
-    setIsHeaderUpgrading(true);
-    try {
-      const checkoutUrl = await purchasePremium(currentUser.uid);
-      if (checkoutUrl) {
-        window.location.href = checkoutUrl;
+  const handleAdCompleted = async () => {
+    setShowAdModal(false);
+    if (currentUser) {
+      try {
+        await incrementUserCredits(currentUser.uid, 1);
+      } catch (err) {
+        console.error("Failed to grant ad credit:", err);
       }
-    } catch (err: any) {
-      console.error("Header upgrade failed:", err);
-      alert(err.message || "Could not initiate premium checkout.");
-    } finally {
-      setIsHeaderUpgrading(false);
     }
   };
 
@@ -243,6 +241,7 @@ const App: React.FC = () => {
           <PhotoEditor 
             appState={state} 
             onUpdateState={updateState} 
+            onTriggerAd={() => setShowAdModal(true)}
           />
         )}
 
@@ -298,29 +297,17 @@ const App: React.FC = () => {
             </button>
           </div>
 
-          {/* Subscription State Badge */}
-          {state.isPremium ? (
-            <div className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-gradient-to-r from-amber-500/20 to-yellow-500/20 border border-yellow-500/30 text-yellow-400 text-[9px] font-extrabold uppercase tracking-widest shadow-md">
-              <svg className="w-2.5 h-2.5 text-yellow-400" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
-              </svg>
-              <span>Premium</span>
-            </div>
-          ) : (
-            <button
-              onClick={handleUpgradeFromHeader}
-              disabled={isHeaderUpgrading}
-              className="flex items-center gap-1 px-2.5 py-1.5 rounded-full bg-indigo-600/95 hover:bg-indigo-500 disabled:bg-indigo-950/40 text-white text-[9px] font-extrabold uppercase tracking-widest shadow-md active:scale-95 transition-all border border-indigo-500/30"
-              title="Upgrade to Premium"
-            >
-              {isHeaderUpgrading ? (
-                <div className="animate-spin rounded-full h-2 w-2 border-b border-white"></div>
-              ) : (
-                <Icons.Magic className="w-2.5 h-2.5" />
-              )}
-              <span>Go Pro</span>
-            </button>
-          )}
+          {/* Credits Balance Badge */}
+          <button
+            onClick={() => setShowOnboardingPaywall(true)}
+            className="flex items-center gap-1 px-2.5 py-1.5 rounded-full bg-gradient-to-r from-indigo-500/15 to-purple-500/15 border border-indigo-500/25 text-indigo-300 hover:text-white text-[9px] font-black uppercase tracking-widest shadow-md active:scale-95 transition-all"
+            title="Buy Credits / Watch Ads"
+          >
+            <svg className="w-2.5 h-2.5 text-indigo-400" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+            </svg>
+            <span>{state.credits} Credits</span>
+          </button>
 
           {/* Album Picker */}
           <button 
@@ -461,7 +448,15 @@ const App: React.FC = () => {
         <PaywallView 
           uid={currentUser.uid} 
           onContinueFree={() => setShowOnboardingPaywall(false)}
-          onUpgradeSuccess={() => setShowOnboardingPaywall(false)}
+          onWatchAdClick={() => setShowAdModal(true)}
+        />
+      )}
+
+      {/* --- Rewarded Video Ad Modal --- */}
+      {showAdModal && (
+        <AdRewardModal 
+          onAdCompleted={handleAdCompleted} 
+          onClose={() => setShowAdModal(false)}
         />
       )}
 

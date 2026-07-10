@@ -30,4 +30,5 @@ export interface AppState {
   isPremium: boolean;
   premiumChecked: boolean;
   generationCount: number;
+  credits: number;
 }

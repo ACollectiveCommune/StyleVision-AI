@@ -1,10 +1,10 @@
 import { Capacitor } from "@capacitor/core";
-import { db } from "./firebase";
-import { doc, setDoc } from "firebase/firestore";
-import { createCheckoutSession, createPortalSession } from "./billingService";
+import { incrementUserCredits, createCheckoutSession, createPortalSession } from "./billingService";
 
-// iOS Apple App Store Subscription Product ID
-export const APPLE_PREMIUM_PRODUCT_ID = "com.stylevision.premium.monthly";
+// iOS Apple App Store Consumable Credit Product IDs
+export const APPLE_STARTER_PRODUCT_ID = "com.stylevision.credits.starter"; // 25 credits
+export const APPLE_PRO_PRODUCT_ID = "com.stylevision.credits.pro";         // 75 credits
+export const APPLE_VALUE_PRODUCT_ID = "com.stylevision.credits.value";     // 150 credits
 
 /**
  * Checks if the app is running inside a native iOS shell.
@@ -16,9 +16,9 @@ export const isIOS = (): boolean => {
 /**
  * Initializes the purchase store system on app startup.
  * - On iOS: Configures native App Store listeners and handles transaction verification (using cordova-plugin-purchase v13+).
- * - On Web: No-op (falls back to Stripe web integration).
+ * - On Web: No-op.
  */
-export const initializeBilling = (uid: string, onPremiumUpdate: (isPremium: boolean) => void) => {
+export const initializeBilling = (uid: string, onCreditsUpdate: (credits: number) => void) => {
   if (!isIOS()) {
     console.log("[IAP LOG] Running on Web. Bypassing native StoreKit initialization.");
     return;
@@ -31,43 +31,69 @@ export const initializeBilling = (uid: string, onPremiumUpdate: (isPremium: bool
     return;
   }
 
-  console.log("[IAP LOG] Initializing StoreKit Apple In-App Purchases (v13+ API)...");
+  console.log("[IAP LOG] Initializing StoreKit Apple In-App Purchases (Consumables)...");
 
-  // 1. Register Monthly Subscription Product using v13+ registration signature
-  store.register([{
-    id: APPLE_PREMIUM_PRODUCT_ID,
-    type: CdvPurchase.ProductType.PAID_SUBSCRIPTION,
-    platform: CdvPurchase.Platform.APPLE_APPSTORE,
-  }]);
+  // 1. Register Consumable Products
+  store.register([
+    {
+      id: APPLE_STARTER_PRODUCT_ID,
+      type: CdvPurchase.ProductType.CONSUMABLE,
+      platform: CdvPurchase.Platform.APPLE_APPSTORE,
+    },
+    {
+      id: APPLE_PRO_PRODUCT_ID,
+      type: CdvPurchase.ProductType.CONSUMABLE,
+      platform: CdvPurchase.Platform.APPLE_APPSTORE,
+    },
+    {
+      id: APPLE_VALUE_PRODUCT_ID,
+      type: CdvPurchase.ProductType.CONSUMABLE,
+      platform: CdvPurchase.Platform.APPLE_APPSTORE,
+    }
+  ]);
 
   // 2. Set Up Event Listeners (approved -> verify -> verified -> finish)
   store.when()
     .approved(async (transaction: any) => {
       console.log(`[IAP LOG] Purchase approved for transaction: ${transaction.transactionId}. Triggering verification...`);
-      // Start receipt verification
       transaction.verify();
     })
     .verified(async (receipt: any) => {
-      console.log(`[IAP LOG] Purchase verified! Unlocking premium status for user ${uid}...`);
+      console.log(`[IAP LOG] Purchase verified! Fetching transaction details...`);
       
-      // Update Firestore user document to unlock premium status
-      if (db) {
-        try {
-          const userDocRef = doc(db, "users", uid);
-          await setDoc(userDocRef, {
-            isPremium: true,
-            premiumSource: "apple_iap",
-            premiumUnlockedAt: new Date().toISOString()
-          }, { merge: true });
-          
-          console.log("[IAP LOG] Firestore updated with premium status.");
-          onPremiumUpdate(true);
-        } catch (dbErr) {
-          console.error("[IAP LOG] Failed to update Firestore with premium status:", dbErr);
-        }
+      // Calculate how many credits to grant based on the purchased product ID
+      let creditsToGrant = 0;
+      let transactionProductId = "";
+
+      // Inspect transaction products
+      if (receipt.transactions && receipt.transactions.length > 0) {
+        transactionProductId = receipt.transactions[0].productId;
+      } else if (receipt.productId) {
+        transactionProductId = receipt.productId;
+      }
+
+      console.log(`[IAP LOG] Purchased Product ID: ${transactionProductId}`);
+
+      if (transactionProductId === APPLE_STARTER_PRODUCT_ID) {
+        creditsToGrant = 25;
+      } else if (transactionProductId === APPLE_PRO_PRODUCT_ID) {
+        creditsToGrant = 75;
+      } else if (transactionProductId === APPLE_VALUE_PRODUCT_ID) {
+        creditsToGrant = 150;
       } else {
-        // Mock fallback if database is offline
-        onPremiumUpdate(true);
+        // Fallback guess: look at the global state or default to Pro
+        console.warn("[IAP LOG] Unknown product ID in transaction. Defaulting to Pro Pack (75 credits).");
+        creditsToGrant = 75;
+      }
+
+      console.log(`[IAP LOG] Granting ${creditsToGrant} credits to user ${uid}...`);
+      
+      try {
+        const newCredits = await incrementUserCredits(uid, creditsToGrant);
+        console.log(`[IAP LOG] Credits updated in Firestore. New balance: ${newCredits}`);
+        onCreditsUpdate(newCredits);
+      } catch (err) {
+        console.error("[IAP LOG] Failed to increment credits in database:", err);
       }
 
       // Finish transaction to prevent Apple from refunding/retrying
@@ -92,11 +118,14 @@ export const initializeBilling = (uid: string, onPremiumUpdate: (isPremium: bool
 };
 
 /**
- * Initiates the premium subscription process.
- * - On iOS: Opens the native StoreKit payment sheet (using cordova-plugin-purchase v13+).
+ * Initiates the premium consumable credit package purchase process.
+ * - On iOS: Opens the native StoreKit payment sheet.
  * - On Web: Redirects to Stripe Checkout.
  */
-export const purchasePremium = async (uid: string): Promise<string | null> => {
+export const purchasePremium = async (
+  uid: string,
+  packType: "starter" | "pro" | "value" = "pro"
+): Promise<string | null> => {
   if (isIOS()) {
     const CdvPurchase = (window as any).CdvPurchase;
     const store = CdvPurchase?.store;
@@ -104,12 +133,16 @@ export const purchasePremium = async (uid: string): Promise<string | null> => {
       throw new Error("StoreKit plugin is not loaded on this platform.");
     }
 
-    console.log(`[IAP LOG] Ordering product: ${APPLE_PREMIUM_PRODUCT_ID}`);
+    let productId = APPLE_PRO_PRODUCT_ID;
+    if (packType === "starter") productId = APPLE_STARTER_PRODUCT_ID;
+    else if (packType === "value") productId = APPLE_VALUE_PRODUCT_ID;
+
+    console.log(`[IAP LOG] Ordering credit product: ${productId} (${packType})`);
     
     // Fetch product information registered in store
-    const product = store.get(APPLE_PREMIUM_PRODUCT_ID);
+    const product = store.get(productId);
     if (!product) {
-      throw new Error(`Product ${APPLE_PREMIUM_PRODUCT_ID} not found in StoreKit registries. Please check your App Store Connect configurations.`);
+      throw new Error(`Product ${productId} not found in StoreKit registries. Please check your App Store Connect configurations.`);
     }
 
     // Fetch the product offer to order (standard in v13+)
@@ -124,24 +157,22 @@ export const purchasePremium = async (uid: string): Promise<string | null> => {
     
     return null;
   } else {
-    // Web fallback to Stripe Checkout
-    return await createCheckoutSession(uid);
+    // Web fallback to Stripe Checkout for the specific package
+    return await createCheckoutSession(uid, packType);
   }
 };
 
 /**
- * Launches the customer subscription management portal.
+ * Launches the customer portal to view transactions/card details.
  * - On iOS: Redirects to Apple Subscriptions portal.
  * - On Web: Redirects to Stripe Customer Portal.
  */
 export const manageBillingSubscription = async (uid: string): Promise<string | null> => {
   if (isIOS()) {
-    // Standard link to manage subscriptions inside the App Store Settings
     const appleSubUrl = "https://apps.apple.com/account/subscriptions";
     window.open(appleSubUrl, "_system");
     return null;
   } else {
-    // Web fallback to Stripe Billing Portal
     return await createPortalSession(uid);
   }
 };

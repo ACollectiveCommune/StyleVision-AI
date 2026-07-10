@@ -3,61 +3,92 @@ import {
   collection, 
   addDoc, 
   onSnapshot, 
-  query, 
-  where,
-  limit,
   doc,
   increment,
   getDoc,
   setDoc
 } from "firebase/firestore";
 
-// Stripe Price ID Constant - Change this to match your Stripe Dashboard Product Price ID
-export const STRIPE_PREMIUM_PRICE_ID = "price_1StyleVisionPremiumMonth";
+// Stripe Price IDs for Consumable Credit Packages
+export const STRIPE_STARTER_PRICE_ID = "price_1StyleVisionCreditsStarter"; // 25 credits
+export const STRIPE_PRO_PRICE_ID = "price_1StyleVisionCreditsPro";         // 75 credits
+export const STRIPE_VALUE_PRICE_ID = "price_1StyleVisionCreditsValue";     // 150 credits
 
 /**
- * Listens to active subscriptions for a given Firebase User ID.
- * The Stripe extension writes active subscriptions to `customers/{uid}/subscriptions`.
+ * Listens to active credit balance for a given Firebase User ID.
+ * Returns a realtime listener unsubscribe function.
  */
-export const subscribeToSubscription = (
+export const subscribeToCredits = (
   uid: string,
-  onUpdate: (isPremium: boolean) => void
+  onUpdate: (credits: number) => void
 ): (() => void) => {
   if (!db) {
-    // If Firebase is not initialized, fallback to mock free account
-    onUpdate(false);
+    // If Firebase is not initialized, fallback to 0 credits
+    onUpdate(0);
     return () => {};
   }
 
-  const subsCollectionRef = collection(db, "customers", uid, "subscriptions");
-  
-  // Query only active or trialing subscriptions
-  const q = query(
-    subsCollectionRef,
-    where("status", "in", ["active", "trialing"]),
-    limit(1)
-  );
+  const userDocRef = doc(db, "users", uid);
 
   return onSnapshot(
-    q,
-    (snapshot) => {
-      const isPremium = !snapshot.empty;
-      console.log(`[BILLING LOG] User subscription state changed. isPremium: ${isPremium}`);
-      onUpdate(isPremium);
+    userDocRef,
+    async (docSnap) => {
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        const credits = typeof data.credits === "number" ? data.credits : 5;
+        onUpdate(credits);
+      } else {
+        // Document does not exist yet. Initialize user with 5 free credits
+        try {
+          await setDoc(userDocRef, { credits: 5 }, { merge: true });
+          onUpdate(5);
+        } catch (err) {
+          console.error("[BILLING LOG] Error creating initial user credits document:", err);
+          onUpdate(5);
+        }
+      }
     },
     (error) => {
-      console.error("[BILLING LOG] Error listening to subscriptions:", error);
-      onUpdate(false);
+      console.error("[BILLING LOG] Error listening to user credits:", error);
+      onUpdate(0);
     }
   );
 };
 
 /**
- * Creates a Stripe Checkout Session document in Firestore.
+ * Increments the user's credits balance in Firestore.
+ */
+export const incrementUserCredits = async (uid: string, amount: number): Promise<number> => {
+  if (!db) return 5;
+  try {
+    const userDocRef = doc(db, "users", uid);
+    await setDoc(userDocRef, { credits: increment(amount) }, { merge: true });
+    
+    // Retrieve updated credit balance
+    const docSnap = await getDoc(userDocRef);
+    return docSnap.data()?.credits ?? 5;
+  } catch (err) {
+    console.error("[BILLING LOG] Error incrementing user credits balance:", err);
+    return 5;
+  }
+};
+
+/**
+ * Decrements the user's credits balance by 1.
+ */
+export const consumeCredit = async (uid: string): Promise<number> => {
+  return await incrementUserCredits(uid, -1);
+};
+
+/**
+ * Creates a Stripe Checkout Session document in Firestore for consumable credit packages.
  * The Stripe Firebase Extension detects this, contacts Stripe,
  * and writes a redirect `url` back to the document.
  */
-export const createCheckoutSession = async (uid: string): Promise<string> => {
+export const createCheckoutSession = async (
+  uid: string,
+  packType: "starter" | "pro" | "value" = "pro"
+): Promise<string> => {
   if (!db) {
     throw new Error("Firebase database not initialized");
   }
@@ -67,8 +98,12 @@ export const createCheckoutSession = async (uid: string): Promise<string> => {
   // Define redirect URLs (redirect back to the current site/app)
   const redirectUrl = window.location.origin;
 
+  let priceId = STRIPE_PRO_PRICE_ID;
+  if (packType === "starter") priceId = STRIPE_STARTER_PRICE_ID;
+  else if (packType === "value") priceId = STRIPE_VALUE_PRICE_ID;
+
   const sessionDocRef = await addDoc(checkoutSessionsRef, {
-    price: STRIPE_PREMIUM_PRICE_ID,
+    price: priceId,
     success_url: `${redirectUrl}/?checkout=success`,
     cancel_url: `${redirectUrl}/?checkout=cancelled`,
   });
@@ -97,46 +132,6 @@ export const createCheckoutSession = async (uid: string): Promise<string> => {
       reject(new Error("Stripe checkout session creation timed out"));
     }, 15000);
   });
-};
-
-/**
- * Fetches or initializes the free generation count for anonymous/free users.
- * Document sits at `users/{uid}`.
- */
-export const getGenerationCount = async (uid: string): Promise<number> => {
-  if (!db) return 0;
-  try {
-    const userDocRef = doc(db, "users", uid);
-    const docSnap = await getDoc(userDocRef);
-    if (docSnap.exists()) {
-      return docSnap.data().generationCount || 0;
-    } else {
-      // Initialize count
-      await setDoc(userDocRef, { generationCount: 0 }, { merge: true });
-      return 0;
-    }
-  } catch (err) {
-    console.error("Error getting generation count:", err);
-    return 0;
-  }
-};
-
-/**
- * Increments the user's free generation count in Firestore.
- */
-export const incrementGenerationCount = async (uid: string): Promise<number> => {
-  if (!db) return 0;
-  try {
-    const userDocRef = doc(db, "users", uid);
-    await setDoc(userDocRef, { generationCount: increment(1) }, { merge: true });
-    
-    // Retrieve updated count
-    const docSnap = await getDoc(userDocRef);
-    return docSnap.data()?.generationCount || 0;
-  } catch (err) {
-    console.error("Error incrementing generation count:", err);
-    return 0;
-  }
 };
 
 /**
