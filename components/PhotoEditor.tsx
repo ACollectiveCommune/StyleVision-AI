@@ -472,6 +472,10 @@ export const PhotoEditor: React.FC<PhotoEditorProps> = ({ uid, appState, onUpdat
                   </button>
                 )}
               </div>
+              {/* Safety Disclaimer */}
+              <p className="text-[9px] text-neutral-500 font-bold uppercase tracking-wider text-left pl-1 pt-1.5 leading-none">
+                🔒 Safe prompt filters are active. Input must comply with EULA.
+              </p>
             </div>
           )}
 

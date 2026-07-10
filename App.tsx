@@ -11,6 +11,8 @@ import { auth, logout, onAuthStateChanged, SavedGeneration, deleteUserAccount } 
 import { subscribeToCredits, incrementUserCredits } from './services/billingService';
 import { initializeBilling, purchasePremium, manageBillingSubscription } from './services/iapService';
 import { AdRewardModal } from './components/AdRewardModal';
+import { LegalDocumentsModal } from './components/LegalDocumentsModal';
+import { initializeAdMob, showRewardedVideoAd } from './services/adService';
 import { User } from 'firebase/auth';
 
 const App: React.FC = () => {
@@ -43,6 +45,9 @@ const App: React.FC = () => {
 
   // Monitor auth state changes
   useEffect(() => {
+    // Initialize Google AdMob (native simulator check)
+    initializeAdMob();
+
     // Safety timeout: if auth state doesn't resolve in 1500ms, force proceed (fallback to guest/login)
     const safetyTimeout = setTimeout(() => {
       console.warn("Firebase Auth listener timed out. Bypassing loading screen.");
@@ -116,6 +121,7 @@ const App: React.FC = () => {
 
   const [showAccountModal, setShowAccountModal] = useState(false);
   const [isBillingPortalLoading, setIsBillingPortalLoading] = useState(false);
+  const [legalTab, setLegalTab] = useState<'terms' | 'privacy' | null>(null);
 
   const handleAdCompleted = async () => {
     setShowAdModal(false);
@@ -131,6 +137,18 @@ const App: React.FC = () => {
     } else {
       const fallbackCredits = state.credits + 1;
       updateState({ credits: fallbackCredits, isPremium: fallbackCredits > 0 });
+    }
+  };
+
+  const handleTriggerAd = async () => {
+    // Attempt showing native AdMob ad
+    const completed = await showRewardedVideoAd();
+    if (completed) {
+      console.log("[ADMOB LOG] Native rewarded ad completed successfully.");
+      await handleAdCompleted();
+    } else {
+      console.log("[ADMOB LOG] Native ad unavailable. Launching mock video sandbox simulator.");
+      setShowAdModal(true);
     }
   };
 
@@ -273,7 +291,7 @@ const App: React.FC = () => {
             uid={currentUser.uid}
             appState={state} 
             onUpdateState={updateState} 
-            onTriggerAd={() => setShowAdModal(true)}
+            onTriggerAd={handleTriggerAd}
           />
         )}
 
@@ -458,13 +476,21 @@ const App: React.FC = () => {
 
             {/* Compliance Legal Footer */}
             <div className="flex justify-center items-center gap-4 text-[9px] font-medium text-neutral-600 uppercase tracking-widest pt-3 border-t border-white/5 w-full">
-              <a href="https://stylevision.ai/terms" target="_blank" rel="noreferrer" className="hover:text-neutral-400 transition-colors">
-                Terms of Use
-              </a>
+              <button 
+                type="button" 
+                onClick={() => setLegalTab('terms')} 
+                className="hover:text-neutral-400 transition-colors font-bold uppercase"
+              >
+                Terms of Use (EULA)
+              </button>
               <span className="w-1 h-1 rounded-full bg-neutral-800"></span>
-              <a href="https://stylevision.ai/privacy" target="_blank" rel="noreferrer" className="hover:text-neutral-400 transition-colors">
+              <button 
+                type="button" 
+                onClick={() => setLegalTab('privacy')} 
+                className="hover:text-neutral-400 transition-colors font-bold uppercase"
+              >
                 Privacy Policy
-              </a>
+              </button>
             </div>
 
           </div>
@@ -476,7 +502,7 @@ const App: React.FC = () => {
         <PaywallView 
           uid={currentUser.uid} 
           onContinueFree={() => setShowOnboardingPaywall(false)}
-          onWatchAdClick={() => setShowAdModal(true)}
+          onWatchAdClick={handleTriggerAd}
         />
       )}
 
@@ -485,6 +511,14 @@ const App: React.FC = () => {
         <AdRewardModal 
           onAdCompleted={handleAdCompleted} 
           onClose={() => setShowAdModal(false)}
+        />
+      )}
+
+      {/* --- Legal Modal Overlay --- */}
+      {legalTab && (
+        <LegalDocumentsModal 
+          initialTab={legalTab} 
+          onClose={() => setLegalTab(null)} 
         />
       )}
 

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Icons } from '../constants';
 import { purchasePremium, isIOS } from '../services/iapService';
+import { LegalDocumentsModal } from './LegalDocumentsModal';
 
 interface PaywallViewProps {
   uid: string;
@@ -12,6 +13,7 @@ export const PaywallView: React.FC<PaywallViewProps> = ({ uid, onContinueFree, o
   const [isProcessing, setIsProcessing] = useState(false);
   const [activePack, setActivePack] = useState<"starter" | "pro" | "value" | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [legalTab, setLegalTab] = useState<'terms' | 'privacy' | null>(null);
 
   const handlePurchase = async (packType: "starter" | "pro" | "value") => {
     setIsProcessing(true);
@@ -186,7 +188,7 @@ export const PaywallView: React.FC<PaywallViewProps> = ({ uid, onContinueFree, o
 
         {/* Pricing disclaimer */}
         <p className="text-[9px] text-neutral-500 leading-normal px-6">
-          Credits do not expire. Consumable purchases are final and added instantly to your balance.
+          Payments are charged to your App Store account upon purchase confirmation. Consumables credit instantly, do not expire, and are final.
         </p>
 
         {/* Actions buttons */}
@@ -213,14 +215,30 @@ export const PaywallView: React.FC<PaywallViewProps> = ({ uid, onContinueFree, o
 
         {/* Compliance Legal Footer */}
         <div className="flex justify-center items-center gap-4 text-[9px] font-medium text-neutral-600 uppercase tracking-widest pt-3 border-t border-white/5 w-full">
-          <a href="https://stylevision.ai/terms" target="_blank" rel="noreferrer" className="hover:text-neutral-400 transition-colors">
-            Terms of Use
-          </a>
+          <button 
+            type="button" 
+            onClick={() => setLegalTab('terms')} 
+            className="hover:text-neutral-400 transition-colors"
+          >
+            Terms of Use (EULA)
+          </button>
           <span className="w-1 h-1 rounded-full bg-neutral-800"></span>
-          <a href="https://stylevision.ai/privacy" target="_blank" rel="noreferrer" className="hover:text-neutral-400 transition-colors">
+          <button 
+            type="button" 
+            onClick={() => setLegalTab('privacy')} 
+            className="hover:text-neutral-400 transition-colors"
+          >
             Privacy Policy
-          </a>
+          </button>
         </div>
+
+        {/* Legal Modal Overlay */}
+        {legalTab && (
+          <LegalDocumentsModal 
+            initialTab={legalTab} 
+            onClose={() => setLegalTab(null)} 
+          />
+        )}
 
       </div>
     </div>
