@@ -57,10 +57,9 @@ const applyDifferenceMask = async (originalSrc: string, generatedSrc: string, cu
 
     const len = origData.data.length;
     
-    const isHairEdited = !!((currentState.selectedHairStyle && currentState.selectedHairStyle.id !== 'original') ||
-                           (currentState.selectedHairColor && currentState.selectedHairColor.id !== 'original'));
-    const isBeardStyleChanged = !!(currentState.selectedBeardStyle && currentState.selectedBeardStyle.id !== 'original');
-    const isBeardEdited = isBeardStyleChanged || !!(currentState.selectedBeardColor && currentState.selectedBeardColor.id !== 'original');
+    const isHairEdited = (currentState.selectedHairStyle.id !== 'original') || (currentState.selectedHairColor.id !== 'original');
+    const isBeardStyleChanged = currentState.selectedBeardStyle.id !== 'original';
+    const isBeardEdited = isBeardStyleChanged || (currentState.selectedBeardColor.id !== 'original');
 
     console.log("[MASK LOG] Blending image coordinates:", w, "x", h);
     console.log("[MASK LOG] isHairEdited:", isHairEdited, "isBeardEdited:", isBeardEdited, "isBeardStyleChanged:", isBeardStyleChanged);
@@ -275,7 +274,7 @@ export const generateStylePreview = async (
   promptParts.push("Modify the hair and facial hair in this photo according to the following specifications:");
 
   // --- 1. HAIRSTYLE ---
-  const isHairStyleOriginal = !selectedHairStyle || selectedHairStyle.id === 'original';
+  const isHairStyleOriginal = selectedHairStyle.id === 'original';
   if (isHairStyleOriginal) {
     promptParts.push("- HAIRSTYLE: Do not change the hairstyle. Keep the hair length, shape, and cut exactly as it is in the original photo.");
   } else {
@@ -284,7 +283,7 @@ export const generateStylePreview = async (
   }
 
   // --- 2. HAIR COLOR ---
-  const isHairColorOriginal = !selectedHairColor || selectedHairColor.id === 'original';
+  const isHairColorOriginal = selectedHairColor.id === 'original';
   if (isHairColorOriginal) {
     promptParts.push("- HAIR COLOR: Do not change the hair color. Keep the original hair color exactly as it is.");
   } else {
@@ -295,10 +294,12 @@ export const generateStylePreview = async (
   // --- 3. FACIAL HAIR (BEARD / MUSTACHE) ---
   if (gender === Gender.MALE) {
     // Beard Style
-    const isBeardStyleOriginal = !selectedBeardStyle || selectedBeardStyle.id === 'original';
+    const isBeardStyleOriginal = selectedBeardStyle.id === 'original';
+    const isCleanShaven = selectedBeardStyle.id === 'none';
+
     if (isBeardStyleOriginal) {
       promptParts.push("- BEARD STYLE: Do not change the beard style. Keep the original facial hair shape, density, or lack of facial hair exactly as it is.");
-    } else if (selectedBeardStyle.id === 'none') {
+    } else if (isCleanShaven) {
       promptParts.push("- BEARD STYLE: Remove all facial hair completely. The subject must be clean-shaven (no mustache, no goatee, no beard, no stubble).");
     } else {
       const styleDesc = STYLE_PROMPTS[selectedBeardStyle.id] || selectedBeardStyle.label;
@@ -306,8 +307,8 @@ export const generateStylePreview = async (
     }
 
     // Beard Color (Only send if they are NOT clean-shaven!)
-    if (selectedBeardStyle && selectedBeardStyle.id !== 'none') {
-      const isBeardColorOriginal = !selectedBeardColor || selectedBeardColor.id === 'original';
+    if (!isCleanShaven) {
+      const isBeardColorOriginal = selectedBeardColor.id === 'original';
       if (isBeardColorOriginal) {
         promptParts.push("- BEARD COLOR: Do not change the facial hair color. Keep the original mustache and beard color exactly as it is.");
       } else if (selectedBeardColor.id === 'match') {

@@ -5,7 +5,7 @@ import { PhotoEditor } from './components/PhotoEditor';
 import { BottomNav } from './components/BottomNav';
 import { LoginView } from './components/LoginView';
 import { FavoritesView } from './components/FavoritesView';
-import { Icons } from './constants';
+import { Icons, HAIR_STYLES_MALE, HAIR_COLORS, BEARD_STYLES, BEARD_COLORS } from './constants';
 import { auth, logout, onAuthStateChanged, SavedGeneration } from './services/firebase';
 import { User } from 'firebase/auth';
 
@@ -15,10 +15,10 @@ const App: React.FC = () => {
     gender: Gender.MALE,
     originalImage: null,
     currentImage: null,
-    selectedHairStyle: null,
-    selectedHairColor: null,
-    selectedBeardStyle: null,
-    selectedBeardColor: null,
+    selectedHairStyle: HAIR_STYLES_MALE[0],
+    selectedHairColor: HAIR_COLORS[0],
+    selectedBeardStyle: BEARD_STYLES[0],
+    selectedBeardColor: BEARD_COLORS[0],
     isProcessing: false,
   });
 
@@ -58,6 +58,10 @@ const App: React.FC = () => {
       originalImage: imageDataUrl,
       currentImage: imageDataUrl, // Reset edits on new photo
       currentMode: AppMode.EDITOR,
+      selectedHairStyle: HAIR_STYLES_MALE[0],
+      selectedHairColor: HAIR_COLORS[0],
+      selectedBeardStyle: BEARD_STYLES[0],
+      selectedBeardColor: BEARD_COLORS[0],
     });
   };
 
@@ -70,7 +74,11 @@ const App: React.FC = () => {
         updateState({
           originalImage: result,
           currentImage: result,
-          currentMode: AppMode.EDITOR
+          currentMode: AppMode.EDITOR,
+          selectedHairStyle: HAIR_STYLES_MALE[0],
+          selectedHairColor: HAIR_COLORS[0],
+          selectedBeardStyle: BEARD_STYLES[0],
+          selectedBeardColor: BEARD_COLORS[0],
         });
       };
       reader.readAsDataURL(file);
@@ -78,11 +86,14 @@ const App: React.FC = () => {
   };
 
   const toggleGender = () => {
+    const nextGender = state.gender === Gender.MALE ? Gender.FEMALE : Gender.MALE;
+    const hairStylesList = nextGender === Gender.MALE ? HAIR_STYLES_MALE : HAIR_STYLES_FEMALE;
     updateState({ 
-      gender: state.gender === Gender.MALE ? Gender.FEMALE : Gender.MALE,
-      selectedBeardStyle: null,
-      selectedBeardColor: null,
-      selectedHairStyle: null,
+      gender: nextGender,
+      selectedHairStyle: hairStylesList[0],
+      selectedHairColor: HAIR_COLORS[0],
+      selectedBeardStyle: BEARD_STYLES[0],
+      selectedBeardColor: BEARD_COLORS[0],
     });
   };
 
