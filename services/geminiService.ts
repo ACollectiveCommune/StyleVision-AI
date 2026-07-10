@@ -141,6 +141,11 @@ const applyDifferenceMask = async (originalSrc: string, generatedSrc: string, cu
         } else if (isBeardRegion && !isBeardEdited) {
           // Beard is not edited: force preserve original facial hair/skin details
           currentThreshold = 999;
+        } else if (isBeardRegion && isBeardEdited) {
+          // Beard IS edited: lower threshold to 12 to let all color/style edits (e.g. white dye)
+          // pass through cleanly without restoring the old brown beard hair.
+          currentThreshold = 12;
+          currentFeather = 4;
         }
 
         if (colorDist < currentThreshold - currentFeather) {
