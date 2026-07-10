@@ -310,9 +310,10 @@ export const generateStylePreview = async (
     1. Only modify the hair and facial hair regions. 
     2. Do NOT change the shape, color, or style of anything else.
     3. NO HEAD SHIFTING: The head position, size, rotation, and angle must remain in the exact same pixel coordinates as the input photo. Do NOT shift, rotate, scale, or move the head. The eyes, nose, mouth, and chin must align perfectly.
-    4. Do NOT smooth, blur, soften, or airbrush the skin. Keep all natural skin texture, visible pores, freckles, and natural skin details exactly as in the original image.
+    4. Do NOT smooth, blur, soften, or airbrush the skin (except in areas covered by the new beard or mustache style). Keep all other natural skin texture, visible pores, freckles, and natural skin details exactly as in the original image.
     5. Keep the eyebrows 100% identical to the original image in shape, thickness, position, and color.
     6. PHOTOREALISTIC BEARD: Make sure the generated beard/mustache hair looks extremely natural and realistic. It must have visible, fine, individual hair strands that naturally feather into the skin. Avoid blocky, solid-painted, drawn-on, or artificial-looking facial hair shapes.
+    7. FULL BEARD INTEGRATION: The new beard must grow naturally from the cheeks, chin, jawline, and mustache area of the face. Do NOT just append a hair extension below the chin; the beard must fully cover the cheeks and chin as specified by the style.
   `);
 
   const prompt = promptParts.join("\n");
@@ -352,14 +353,14 @@ export const generateStylePreview = async (
             - Accurately apply the requested style and color changes to the hair and beard.
             - If a style or color is marked "Do not change" or "Keep original", you must leave that specific feature untouched.
             - Ensure the colors selected for hair and beard match the prompt exactly (e.g. if blonde is selected, hair must be dyed golden blonde).
-            - NATURAL FACIAL HAIR TEXTURE: The generated beard and mustache must look like real, high-resolution facial hair. It must feature distinct, fine hair strands, natural shading, and soft feathering where the hair meets the skin. Do NOT generate solid-painted blocks of color, blur, or drawn-on cartoon lines.
+            - NATURAL FACIAL HAIR TEXTURE: The generated beard and mustache must look like real, high-resolution facial hair. It must feature distinct, fine hair strands, natural shading, and soft feathering where the hair meets the skin. The beard must grow naturally from the cheeks and chin, fully covering those regions of the face as appropriate for the style. Do NOT generate solid-painted blocks of color, blur, or drawn-on cartoon lines, and do not just hang hair below the jawline without connecting it to the face.
             
             IDENTITY, FACE, & SPATIAL ALIGNMENT RULES:
             - NO HEAD SHIFTING: The head position, size, rotation, and angle must remain in the exact same pixel coordinates as the input photo. Do NOT shift, rotate, scale, or move the head. The eyes, eyebrows, nose, mouth, and chin must align perfectly.
-            - STRICT SKIN TEXTURE PRESERVATION: Do NOT smooth, blur, soften, filter, or airbrush the skin. The skin texture must remain completely natural, showing the original pores, freckles, wrinkles, facial lines, grain, skin tone, and details exactly as they are in the original image. Avoid any 'beautified', 'plastic', or 'airbrushed' look on the skin.
+            - STRICT SKIN TEXTURE PRESERVATION: Do NOT smooth, blur, soften, filter, or airbrush the skin (except where the new beard style physically covers the cheeks, chin, or upper lip). The skin texture elsewhere must remain completely natural, showing the original pores, freckles, wrinkles, facial lines, grain, skin tone, and details exactly as they are in the original image. Avoid any 'beautified', 'plastic', or 'airbrushed' look on the skin.
             - STRICT EYEBROW PRESERVATION: Do NOT modify the eyebrows. The shape, thickness, arches, density, color, and placement of the eyebrows must remain exactly identical to the input image.
             - The background, clothing, camera angle, lighting, and ambient shadows must not change at all.
-            - Only modify pixels representing the hair-on-head region and the facial hair region.`
+            - Only modify pixels representing the hair-on-head region and the facial hair region, ensuring the facial hair is fully connected and grows naturally from the cheeks and chin.`
           }
         ]
       }
