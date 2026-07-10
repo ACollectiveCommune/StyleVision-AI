@@ -6,6 +6,7 @@ import { auth, saveGeneration, uploadImageToStorage, toggleFavorite } from '../s
 import { consumeCredit } from '../services/billingService';
 import { purchasePremium } from '../services/iapService';
 import { PaywallView } from './PaywallView';
+import { triggerAppStoreReview } from '../services/rateService';
 
 const compressImageBase64 = (base64Str: string, maxDim: number = 360, quality: number = 0.5): Promise<string> => {
   return new Promise((resolve) => {
@@ -115,6 +116,17 @@ export const PhotoEditor: React.FC<PhotoEditorProps> = ({ uid, appState, onUpdat
           credits: nextCredits
         });
         setIsControlsVisible(true); // Restore controls on success
+
+        // Trigger native App Store Review dialog on 2nd successful generation (high-satisfaction moment)
+        try {
+          const hasPromptedReview = localStorage.getItem("has_prompted_review");
+          if (!hasPromptedReview && appState.generationCount >= 1) {
+            localStorage.setItem("has_prompted_review", "true");
+            triggerAppStoreReview();
+          }
+        } catch (e) {
+          console.warn("Storage check failed for rate prompt:", e);
+        }
         
         // Auto-save styling prediction to Firestore
         if (user && appState.originalImage) {
