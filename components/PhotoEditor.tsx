@@ -291,7 +291,10 @@ export const PhotoEditor: React.FC<PhotoEditorProps> = ({ appState, onUpdateStat
 
           {/* Persistent Credit Top-Up Banner */}
           {appState.credits <= 10 && (
-            <div className="px-4 py-2.5 mx-4 my-1.5 rounded-2xl bg-gradient-to-r from-indigo-500/20 to-purple-500/20 border border-indigo-500/30 flex justify-between items-center shadow-lg">
+            <div 
+              onClick={() => setShowUpgradeModal(true)}
+              className="px-4 py-2.5 mx-4 my-1.5 rounded-2xl bg-gradient-to-r from-indigo-500/20 to-purple-500/20 border border-indigo-500/30 flex justify-between items-center shadow-lg cursor-pointer hover:from-indigo-500/25 hover:to-purple-500/25 active:scale-[0.99] transition-all"
+            >
               <div className="flex items-center gap-2 text-left">
                 <div className="w-6 h-6 rounded-lg bg-indigo-500/20 flex items-center justify-center text-indigo-400 flex-shrink-0">
                   <Icons.Magic className="w-3.5 h-3.5" />
@@ -303,13 +306,11 @@ export const PhotoEditor: React.FC<PhotoEditorProps> = ({ appState, onUpdateStat
                   </span>
                 </div>
               </div>
-              <button
-                type="button"
-                onClick={() => setShowUpgradeModal(true)}
-                className="px-3 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-[9px] font-extrabold uppercase tracking-widest text-white shadow-sm active:scale-95 transition-transform"
+              <div
+                className="px-3 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-[9px] font-extrabold uppercase tracking-widest text-white shadow-sm transition-transform"
               >
                 Top Up
-              </button>
+              </div>
             </div>
           )}
 
