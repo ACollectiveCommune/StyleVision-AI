@@ -5,7 +5,7 @@ import { PhotoEditor } from './components/PhotoEditor';
 import { BottomNav } from './components/BottomNav';
 import { LoginView } from './components/LoginView';
 import { FavoritesView } from './components/FavoritesView';
-import { Icons, HAIR_STYLES_MALE, HAIR_COLORS, BEARD_STYLES, BEARD_COLORS } from './constants';
+import { Icons, HAIR_STYLES_MALE, HAIR_STYLES_FEMALE, HAIR_COLORS, BEARD_STYLES, BEARD_COLORS } from './constants';
 import { auth, logout, onAuthStateChanged, SavedGeneration } from './services/firebase';
 import { User } from 'firebase/auth';
 
