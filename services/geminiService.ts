@@ -26,9 +26,10 @@ const applyDifferenceMask = async (originalSrc: string, generatedSrc: string, cu
   try {
     const isBeardStyleChanged = currentState.selectedBeardStyle.id !== 'original';
     const isBeardEdited = isBeardStyleChanged || (currentState.selectedBeardColor.id !== 'original');
+    const isFemaleHairTryOn = currentState.gender === Gender.FEMALE && currentState.selectedHairStyle.id !== 'original';
 
-    if (isBeardEdited) {
-      console.log("[MASK LOG] Beard is edited. Bypassing difference mask to ensure natural alignment.");
+    if (isBeardEdited || isFemaleHairTryOn) {
+      console.log("[MASK LOG] Beard is edited or Female hair try-on active. Bypassing difference mask to ensure natural chin/jaw alignment.");
       return generatedSrc;
     }
 
@@ -323,8 +324,13 @@ export const generateStylePreview = async (
       }
     }
   } else {
-    // Female
-    promptParts.push("- FACIAL HAIR: The face must remain completely clean-shaven with absolutely no mustache, stubble, or beard.");
+    // Female Mode
+    const isBeardStyleOriginal = selectedBeardStyle.id === 'original';
+    if (isBeardStyleOriginal) {
+      promptParts.push("- FACIAL HAIR: Do not change the facial hair. Keep the original mustache, beard, stubble, or lack of facial hair exactly as it is.");
+    } else {
+      promptParts.push("- FACIAL HAIR: The face must remain completely clean-shaven with absolutely no mustache, stubble, or beard.");
+    }
   }
 
   // --- 4. STRICT PRESERVATION & ALIGNMENT IN USER PROMPT ---
