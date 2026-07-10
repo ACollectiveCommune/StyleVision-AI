@@ -59,11 +59,11 @@ const applyDifferenceMask = async (originalSrc: string, generatedSrc: string, cu
     
     const isHairEdited = !!((currentState.selectedHairStyle && currentState.selectedHairStyle.id !== 'original') ||
                            (currentState.selectedHairColor && currentState.selectedHairColor.id !== 'original'));
-    const isBeardEdited = !!((currentState.selectedBeardStyle && currentState.selectedBeardStyle.id !== 'original') ||
-                            (currentState.selectedBeardColor && currentState.selectedBeardColor.id !== 'original'));
+    const isBeardStyleChanged = !!(currentState.selectedBeardStyle && currentState.selectedBeardStyle.id !== 'original');
+    const isBeardEdited = isBeardStyleChanged || !!(currentState.selectedBeardColor && currentState.selectedBeardColor.id !== 'original');
 
     console.log("[MASK LOG] Blending image coordinates:", w, "x", h);
-    console.log("[MASK LOG] isHairEdited:", isHairEdited, "isBeardEdited:", isBeardEdited);
+    console.log("[MASK LOG] isHairEdited:", isHairEdited, "isBeardEdited:", isBeardEdited, "isBeardStyleChanged:", isBeardStyleChanged);
     console.log("[MASK LOG] Selected style:", currentState.selectedHairStyle?.id, "/", currentState.selectedBeardStyle?.id);
     console.log("[MASK LOG] Selected color:", currentState.selectedHairColor?.id, "/", currentState.selectedBeardColor?.id);
 
@@ -146,10 +146,12 @@ const applyDifferenceMask = async (originalSrc: string, generatedSrc: string, cu
           // Beard is not edited: force preserve original facial hair/skin details
           currentThreshold = 999;
         } else if (isBeardRegion && isBeardEdited) {
-          // Beard IS edited: lower threshold to 12 to let all color/style edits (e.g. white dye)
-          // pass through cleanly without restoring the old brown beard hair.
-          currentThreshold = 12;
-          currentFeather = 4;
+          // Beard IS edited:
+          // - If style changed (e.g. Clean shaven, Goatee, Mustache): set threshold to 0 to use 
+          //   the generated clean skin or style 100% without letting old stubble restore.
+          // - If only color changed on original style: use threshold 12 to dye brown hair white/blonde cleanly.
+          currentThreshold = isBeardStyleChanged ? 0 : 12;
+          currentFeather = isBeardStyleChanged ? 2 : 4;
         }
 
         if (colorDist < currentThreshold - currentFeather) {
@@ -303,16 +305,18 @@ export const generateStylePreview = async (
       promptParts.push(`- BEARD STYLE: Apply a ${styleDesc}. Remove any other facial hair that does not belong to this style.`);
     }
 
-    // Beard Color
-    const isBeardColorOriginal = !selectedBeardColor || selectedBeardColor.id === 'original';
-    if (isBeardColorOriginal) {
-      promptParts.push("- BEARD COLOR: Do not change the facial hair color. Keep the original mustache and beard color exactly as it is.");
-    } else if (selectedBeardColor.id === 'match') {
-      const targetColor = isHairColorOriginal ? "the original hair color" : `${COLOR_PROMPTS[selectedHairColor.id]} (matching the new hair color)`;
-      promptParts.push(`- BEARD COLOR: Dye the mustache and beard hair to ${targetColor}.`);
-    } else {
-      const colorDesc = COLOR_PROMPTS[selectedBeardColor.id] || selectedBeardColor.label;
-      promptParts.push(`- BEARD COLOR: Dye the mustache and beard hair to a ${colorDesc} color. Ensure all facial hair matches this exact color.`);
+    // Beard Color (Only send if they are NOT clean-shaven!)
+    if (selectedBeardStyle && selectedBeardStyle.id !== 'none') {
+      const isBeardColorOriginal = !selectedBeardColor || selectedBeardColor.id === 'original';
+      if (isBeardColorOriginal) {
+        promptParts.push("- BEARD COLOR: Do not change the facial hair color. Keep the original mustache and beard color exactly as it is.");
+      } else if (selectedBeardColor.id === 'match') {
+        const targetColor = isHairColorOriginal ? "the original hair color" : `${COLOR_PROMPTS[selectedHairColor.id]} (matching the new hair color)`;
+        promptParts.push(`- BEARD COLOR: Dye the mustache and beard hair to ${targetColor}.`);
+      } else {
+        const colorDesc = COLOR_PROMPTS[selectedBeardColor.id] || selectedBeardColor.label;
+        promptParts.push(`- BEARD COLOR: Dye the mustache and beard hair to a ${colorDesc} color. Ensure all facial hair matches this exact color.`);
+      }
     }
   } else {
     // Female
