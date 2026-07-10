@@ -249,7 +249,7 @@ export const PhotoEditor: React.FC<PhotoEditorProps> = ({ appState, onUpdateStat
 
       {/* 4. Editor Controls Overlay (Bottom) */}
       {isControlsVisible ? (
-        <div className="absolute bottom-24 left-0 right-0 z-40 flex flex-col gap-0 pb-3 pt-1 rounded-t-3xl bg-black/60 backdrop-blur-2xl border-t border-white/10 animate-in slide-in-from-bottom duration-300 pointer-events-auto">
+        <div className="absolute bottom-24 left-0 right-0 z-40 flex flex-col gap-0 pb-3 pt-1 rounded-t-3xl bg-black/60 backdrop-blur-2xl border-t border-black/30 animate-in slide-in-from-bottom duration-300 pointer-events-auto">
           
           {/* Top Collapse Handle */}
           <div className="flex justify-center items-center h-5 cursor-pointer group" onClick={() => setIsControlsVisible(false)}>
@@ -257,7 +257,7 @@ export const PhotoEditor: React.FC<PhotoEditorProps> = ({ appState, onUpdateStat
           </div>
 
           {/* Tab Selection */}
-          <div className="flex justify-center border-b border-white/5 px-4 mb-2">
+          <div className="flex justify-center border-b border-black/30 px-4 mb-2">
             <button
               type="button"
               onClick={() => setActiveTab('hair')}
@@ -392,7 +392,7 @@ export const PhotoEditor: React.FC<PhotoEditorProps> = ({ appState, onUpdateStat
               </div>
 
               {/* Text Input Bar */}
-              <div className="relative flex items-center bg-white/5 rounded-xl border border-white/10 px-3 py-2 shadow-inner focus-within:border-white/30 transition-all">
+              <div className="relative flex items-center bg-white/5 rounded-xl border border-black/30 px-3 py-2 shadow-inner focus-within:border-white/20 transition-all">
                 <input
                   type="text"
                   value={appState.customPrompt || ''}
@@ -425,7 +425,7 @@ export const PhotoEditor: React.FC<PhotoEditorProps> = ({ appState, onUpdateStat
               className={`w-full py-2.5 rounded-xl font-bold text-xs uppercase tracking-widest transition-all active:scale-[0.98] border flex items-center justify-center gap-2 ${
                 appState.isProcessing
                   ? 'bg-white/5 text-white/30 border-white/5 cursor-not-allowed'
-                  : 'bg-white/10 backdrop-blur-md hover:bg-white/15 text-white border-white/20 hover:border-white/30 shadow-[0_4px_12px_rgba(0,0,0,0.15)]'
+                  : 'bg-white/10 backdrop-blur-md hover:bg-white/15 text-white border-black/30 hover:border-black/55 shadow-[0_4px_12px_rgba(0,0,0,0.15)]'
               }`}
             >
               {appState.isProcessing ? (

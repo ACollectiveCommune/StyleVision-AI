@@ -9,7 +9,7 @@ interface BottomNavProps {
 
 export const BottomNav: React.FC<BottomNavProps> = ({ currentMode, onSwitchMode }) => {
   return (
-    <div className="absolute bottom-0 left-0 right-0 h-[calc(5rem+env(safe-area-inset-bottom,16px))] pb-[env(safe-area-inset-bottom,16px)] bg-black/40 backdrop-blur-2xl border-t border-white/5 flex justify-around items-center z-50">
+    <div className="absolute bottom-0 left-0 right-0 h-[calc(5rem+env(safe-area-inset-bottom,16px))] pb-[env(safe-area-inset-bottom,16px)] bg-black/40 backdrop-blur-2xl border-t border-black/30 flex justify-around items-center z-50">
       
       <button 
         onClick={() => onSwitchMode(AppMode.CAMERA)}
