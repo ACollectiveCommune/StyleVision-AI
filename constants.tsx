@@ -56,6 +56,11 @@ const HairPaths: Record<string, string> = {
   dreads: "M25,45 Q20,10 50,10 Q80,10 75,45 M35,45 L35,60 M45,45 L45,65 M55,45 L55,65 M65,45 L65,60",
   manbun: "M30,40 Q30,20 50,20 Q70,20 70,40 M45,20 Q45,10 50,10 Q55,10 55,20",
   surfer: "M30,40 Q20,40 20,70 M70,40 Q80,40 80,70 M30,40 Q30,15 50,15 Q70,15 70,40",
+  afro: "M20,40 Q10,15 50,10 Q90,15 80,40 Q90,60 80,75 Q50,90 20,75 Q10,60 20,40",
+  mullet: "M28,40 Q25,15 50,15 Q75,15 72,40 M20,60 L20,95 M80,60 L80,95",
+  fauxhawk: "M40,30 Q50,0 60,30 L70,40 Q50,25 30,40 Z",
+  taper: "M28,42 Q28,25 50,22 Q72,25 72,42 Q50,30 28,42",
+  topknot: "M30,42 Q30,22 50,22 Q70,22 70,42 M47,22 L53,22 L55,10 L45,10 Z",
   
   // Female
   none: "", // Just face
@@ -69,6 +74,11 @@ const HairPaths: Record<string, string> = {
   bangs: "M30,40 Q20,40 20,80 M70,40 Q80,40 80,80 M30,40 Q30,10 50,10 Q70,10 70,40 M30,40 Q50,45 70,40",
   braids: "M30,40 Q20,40 20,90 M70,40 Q80,40 80,90 M30,40 Q30,10 50,10 Q70,10 70,40 M20,50 L25,55 M80,50 L75,55",
   updo: "M30,40 Q25,15 50,15 Q75,15 70,40 M35,15 Q35,0 50,0 Q65,0 65,15",
+  shag: "M30,40 Q10,40 15,80 M70,40 Q90,40 85,80 M30,40 Q30,5 50,5 Q70,5 70,40 M32,45 Q50,52 68,45",
+  curtainbangs: "M30,40 Q15,40 15,90 M70,40 Q85,40 85,90 M30,40 Q50,15 70,40 M42,40 Q50,55 58,40",
+  pixiebob: "M30,40 Q20,30 20,55 Q35,50 40,42 M70,40 Q80,25 72,45 Q60,40 50,42",
+  cornrows: "M30,40 Q30,10 50,10 Q70,10 70,40 M38,13 L38,40 M46,11 L46,41 M54,11 L54,41 M62,13 L62,40",
+  spacebuns: "M30,40 Q30,15 50,15 Q70,15 70,40 M20,25 Q15,10 30,15 Q30,30 20,25 M80,25 Q85,10 70,15 Q70,30 80,25",
 };
 
 // Beard Paths (Overlay on bottom of face)
@@ -138,17 +148,22 @@ export const StyleIllustration = ({ id, type }: { id: string, type: 'hair' | 'be
 export const HAIR_STYLES_MALE: StyleOption[] = [
   { id: 'original', label: 'Original', category: 'hair', type: 'style' },
   { id: 'bald', label: 'Bald', category: 'hair', type: 'style' },
+  { id: 'afro', label: 'Afro', category: 'hair', type: 'style' },
   { id: 'buzz', label: 'Buzz Cut', category: 'hair', type: 'style' },
   { id: 'crew', label: 'Crew Cut', category: 'hair', type: 'style' },
   { id: 'curlytop', label: 'Curly Top', category: 'hair', type: 'style' },
   { id: 'dreads', label: 'Dreadlocks', category: 'hair', type: 'style' },
   { id: 'fade', label: 'High Fade', category: 'hair', type: 'style' },
+  { id: 'fauxhawk', label: 'Faux Hawk', category: 'hair', type: 'style' },
   { id: 'manbun', label: 'Man Bun', category: 'hair', type: 'style' },
+  { id: 'mullet', label: 'Mullet', category: 'hair', type: 'style' },
   { id: 'pompadour', label: 'Pompadour', category: 'hair', type: 'style' },
   { id: 'quiff', label: 'Quiff', category: 'hair', type: 'style' },
   { id: 'sidepart', label: 'Side Part', category: 'hair', type: 'style' },
   { id: 'slick', label: 'Slicked Back', category: 'hair', type: 'style' },
   { id: 'surfer', label: 'Surfer / Long', category: 'hair', type: 'style' },
+  { id: 'taper', label: 'Taper Fade', category: 'hair', type: 'style' },
+  { id: 'topknot', label: 'Top Knot', category: 'hair', type: 'style' },
   { id: 'undercut', label: 'Undercut', category: 'hair', type: 'style' },
 ];
 
@@ -157,12 +172,17 @@ export const HAIR_STYLES_FEMALE: StyleOption[] = [
   { id: 'bangs', label: 'Bangs / Fringe', category: 'hair', type: 'style' },
   { id: 'bob', label: 'Bob Cut', category: 'hair', type: 'style' },
   { id: 'braids', label: 'Braids', category: 'hair', type: 'style' },
+  { id: 'cornrows', label: 'Cornrows', category: 'hair', type: 'style' },
   { id: 'curly', label: 'Curly / Afro', category: 'hair', type: 'style' },
+  { id: 'curtainbangs', label: 'Curtain Bangs', category: 'hair', type: 'style' },
   { id: 'lob', label: 'Long Bob', category: 'hair', type: 'style' },
   { id: 'longstraight', label: 'Long Straight', category: 'hair', type: 'style' },
   { id: 'longwavy', label: 'Long Wavy', category: 'hair', type: 'style' },
   { id: 'pixie', label: 'Pixie Cut', category: 'hair', type: 'style' },
+  { id: 'pixiebob', label: 'Pixie Bob', category: 'hair', type: 'style' },
+  { id: 'shag', label: 'Shag Cut', category: 'hair', type: 'style' },
   { id: 'shoulder', label: 'Shoulder Length', category: 'hair', type: 'style' },
+  { id: 'spacebuns', label: 'Space Buns', category: 'hair', type: 'style' },
   { id: 'updo', label: 'Updo / Bun', category: 'hair', type: 'style' },
 ];
 

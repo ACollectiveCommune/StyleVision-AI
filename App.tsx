@@ -129,10 +129,10 @@ const App: React.FC = () => {
     <div className="relative w-full h-screen bg-black overflow-hidden font-sans text-white select-none">
       
       {/* --- Top Bar (Transparent / Floating) --- */}
-      <div className="absolute top-0 left-0 right-0 z-50 p-4 pt-safe-top flex justify-between items-center bg-gradient-to-b from-black/80 to-transparent pointer-events-none">
+      <div className="absolute top-0 left-0 right-0 z-50 p-4 pt-safe-top flex justify-between items-center bg-gradient-to-b from-black/80 to-transparent">
         
         {/* Branding & Signout */}
-        <div className="flex items-center gap-3 pointer-events-auto">
+        <div className="flex items-center gap-3">
           <div className="w-8 h-8 rounded-xl bg-white/10 backdrop-blur-md border border-white/10 flex items-center justify-center font-bold text-xs shadow-lg">
             <span className="bg-gradient-to-tr from-indigo-400 to-purple-400 bg-clip-text text-transparent">SV</span>
           </div>
@@ -153,7 +153,7 @@ const App: React.FC = () => {
         </div>
 
         {/* Controls: Gender & Album */}
-        <div className="flex items-center gap-3 pointer-events-auto">
+        <div className="flex items-center gap-3">
           
           {/* Gender Toggle Pill */}
           <button 

@@ -195,6 +195,11 @@ const STYLE_PROMPTS: Record<string, string> = {
   dreads: "medium-length dreadlock locs hanging down",
   manbun: "man bun hairstyle, with hair pulled back and tied into a bun at the crown",
   surfer: "long wavy surfer style hair, falling naturally down to the shoulders",
+  afro: "classic volumetric rounded afro hairstyle with thick, dense kinky hair curls",
+  fauxhawk: "faux hawk hairstyle with short tapered sides and a spiked central ridge of hair running from front to back",
+  mullet: "classic retro mullet hairstyle, short on the front and sides, and flowing into long hair covering the back of the neck",
+  taper: "clean classic taper fade haircut, with short sides and natural texture on top",
+  topknot: "top knot hairstyle, with shaved undercut sides and back, and hair gathered into a neat bun or ponytail at the crown of the head",
   
   // Female Hair
   pixie: "short pixie haircut with textured layers and short sides",
@@ -207,6 +212,11 @@ const STYLE_PROMPTS: Record<string, string> = {
   bangs: "straight hair with flat bangs (fringe) covering the forehead",
   braids: "hair styled into long, neat braids",
   updo: "elegant updo hairstyle, with hair swept up and pinned neatly in a bun",
+  shag: "shag haircut with highly textured layered shag cuts, choppy layers, and full bangs covering the forehead",
+  curtainbangs: "long wavy hair styled with middle-parted curtain bangs framing both sides of the face",
+  pixiebob: "asymmetrical pixie bob cut, combines short cropped pixie layers on one side with a chin-length bob crop on the other",
+  cornrows: "hair styled flat to the scalp in tight parallel braided rows (cornrows)",
+  spacebuns: "fun double space buns hairstyle, with two high buns styled symmetrically on each side of the head",
 
   // Beard
   stubble: "light 3-day stubble facial hair along the jawline, chin, and upper lip",
