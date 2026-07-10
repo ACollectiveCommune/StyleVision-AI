@@ -7,7 +7,7 @@ import { LoginView } from './components/LoginView';
 import { FavoritesView } from './components/FavoritesView';
 import { PaywallView } from './components/PaywallView';
 import { Icons, HAIR_STYLES_MALE, HAIR_STYLES_FEMALE, HAIR_COLORS, BEARD_STYLES, BEARD_COLORS } from './constants';
-import { auth, logout, onAuthStateChanged, SavedGeneration } from './services/firebase';
+import { auth, logout, onAuthStateChanged, SavedGeneration, deleteUserAccount } from './services/firebase';
 import { subscribeToCredits, incrementUserCredits } from './services/billingService';
 import { initializeBilling, purchasePremium, manageBillingSubscription } from './services/iapService';
 import { AdRewardModal } from './components/AdRewardModal';
@@ -125,6 +125,31 @@ const App: React.FC = () => {
       } catch (err) {
         console.error("Failed to grant ad credit:", err);
       }
+    }
+  };
+
+  const handleDeleteAccount = async () => {
+    if (!currentUser) return;
+    const confirmFirst = window.confirm(
+      "Are you sure you want to delete your account? This will permanently wipe all your credit balance and saved favorites. This action CANNOT be undone."
+    );
+    if (!confirmFirst) return;
+
+    const confirmSecond = window.confirm(
+      "FINAL WARNING: Click OK to delete all your user profile data and close your account forever."
+    );
+    if (!confirmSecond) return;
+
+    try {
+      setIsBillingPortalLoading(true);
+      await deleteUserAccount();
+      setShowAccountModal(false);
+      alert("Your account was successfully deleted.");
+    } catch (err: any) {
+      console.error("Account deletion failed:", err);
+      alert(err.message || "Failed to delete account. You may need to sign out and sign back in to re-authenticate before deleting.");
+    } finally {
+      setIsBillingPortalLoading(false);
     }
   };
 
@@ -386,59 +411,55 @@ const App: React.FC = () => {
               </div>
 
               <div className="flex justify-between items-center border-t border-white/5 pt-3">
-                <span className="text-[11px] font-bold text-neutral-400 uppercase tracking-wide">Generations</span>
+                <span className="text-[11px] font-bold text-neutral-400 uppercase tracking-wide">Balance</span>
                 <span className="text-xs font-bold text-white">
-                  {state.isPremium ? "Unlimited" : `${state.generationCount} / 3 Free`}
+                  {state.credits} Credits
                 </span>
               </div>
             </div>
 
             {/* Actions */}
             <div className="flex flex-col space-y-3 pt-2">
-              {state.isPremium ? (
-                <button
-                  onClick={handleManageSubscription}
-                  disabled={isBillingPortalLoading}
-                  className="w-full py-3 rounded-xl bg-white/10 hover:bg-white/15 border border-white/10 font-extrabold text-[10px] uppercase tracking-widest text-white transition-all active:scale-[0.98] flex items-center justify-center gap-2"
-                >
-                  {isBillingPortalLoading ? (
-                    <>
-                      <div className="animate-spin rounded-full h-3.5 w-3.5 border-b-2 border-white"></div>
-                      <span>Connecting Portal...</span>
-                    </>
-                  ) : (
-                    <span>Manage Subscription</span>
-                  )}
-                </button>
-              ) : (
-                <button
-                  onClick={async () => {
-                    setShowAccountModal(false);
-                    try {
-                      const url = await purchasePremium(currentUser!.uid);
-                      if (url) {
-                        window.location.href = url;
-                      }
-                    } catch (err: any) {
-                      alert(err.message || "Failed to start premium upgrade.");
-                    }
-                  }}
-                  className="w-full py-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 font-extrabold text-[10px] uppercase tracking-widest text-white transition-all active:scale-[0.98] shadow-lg shadow-indigo-600/20"
-                >
-                  Upgrade to Premium
-                </button>
-              )}
+              <button
+                onClick={() => {
+                  setShowAccountModal(false);
+                  setShowOnboardingPaywall(true);
+                }}
+                className="w-full py-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 font-extrabold text-[10px] uppercase tracking-widest text-white transition-all active:scale-[0.98] shadow-lg shadow-indigo-600/25"
+              >
+                Buy Credit Packs
+              </button>
 
               <button
                 onClick={() => {
                   setShowAccountModal(false);
                   logout();
                 }}
-                className="w-full py-3 rounded-xl bg-red-950/20 hover:bg-red-950/30 border border-red-500/20 font-extrabold text-[10px] uppercase tracking-widest text-red-400 transition-all active:scale-[0.98]"
+                className="w-full py-3 rounded-xl bg-white/5 hover:bg-white/10 border border-white/5 font-extrabold text-[10px] uppercase tracking-widest text-white/95 transition-all active:scale-[0.98]"
               >
                 Sign Out
               </button>
+
+              <button
+                onClick={handleDeleteAccount}
+                disabled={isBillingPortalLoading}
+                className="w-full py-3 rounded-xl bg-red-950/20 hover:bg-red-950/30 border border-red-500/10 font-extrabold text-[10px] uppercase tracking-widest text-red-500 hover:text-red-400 transition-all active:scale-[0.98]"
+              >
+                Delete Account
+              </button>
             </div>
+
+            {/* Compliance Legal Footer */}
+            <div className="flex justify-center items-center gap-4 text-[9px] font-medium text-neutral-600 uppercase tracking-widest pt-3 border-t border-white/5 w-full">
+              <a href="https://stylevision.ai/terms" target="_blank" rel="noreferrer" className="hover:text-neutral-400 transition-colors">
+                Terms of Use
+              </a>
+              <span className="w-1 h-1 rounded-full bg-neutral-800"></span>
+              <a href="https://stylevision.ai/privacy" target="_blank" rel="noreferrer" className="hover:text-neutral-400 transition-colors">
+                Privacy Policy
+              </a>
+            </div>
+
           </div>
         </div>
       )}

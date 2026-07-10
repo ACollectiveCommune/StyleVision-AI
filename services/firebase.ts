@@ -7,7 +7,8 @@ import {
   signInWithCredential,
   signOut,
   onAuthStateChanged as firebaseOnAuthStateChanged,
-  signInAnonymously as firebaseSignInAnonymously
+  signInAnonymously as firebaseSignInAnonymously,
+  deleteUser
 } from "firebase/auth";
 import { 
   getFirestore, 
@@ -191,6 +192,45 @@ export const logout = async () => {
       console.error("Firebase signOut failed:", e);
     }
   }
+  notifyAuthChange(null);
+};
+
+/**
+ * Deletes the currently authenticated user's profile, favorites, and auth credential.
+ */
+export const deleteUserAccount = async (): Promise<void> => {
+  const currentUser = auth?.currentUser;
+  if (!currentUser) {
+    throw new Error("No authenticated user found.");
+  }
+  
+  const uid = currentUser.uid;
+
+  // 1. Delete user profile record in Firestore
+  if (db) {
+    try {
+      await deleteDoc(doc(db, "users", uid));
+      console.log(`[FIREBASE] Wiped user profile document for: ${uid}`);
+    } catch (e) {
+      console.error("[FIREBASE] Error deleting user profile doc:", e);
+    }
+
+    // 2. Delete user's saved favorites
+    try {
+      const favoritesRef = collection(db, "favorites");
+      const q = query(favoritesRef, where("userId", "==", uid));
+      const snapshot = await getDocs(q);
+      const deletePromises = snapshot.docs.map(doc => deleteDoc(doc.ref));
+      await Promise.all(deletePromises);
+      console.log(`[FIREBASE] Wiped ${deletePromises.length} favorites for user: ${uid}`);
+    } catch (e) {
+      console.error("[FIREBASE] Error deleting user favorites:", e);
+    }
+  }
+
+  // 3. Delete user credentials from Firebase Auth
+  await deleteUser(currentUser);
+  console.log("[FIREBASE] Authentication record successfully deleted.");
   notifyAuthChange(null);
 };
 

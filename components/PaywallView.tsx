@@ -211,6 +211,17 @@ export const PaywallView: React.FC<PaywallViewProps> = ({ uid, onContinueFree, o
           </button>
         )}
 
+        {/* Compliance Legal Footer */}
+        <div className="flex justify-center items-center gap-4 text-[9px] font-medium text-neutral-600 uppercase tracking-widest pt-3 border-t border-white/5 w-full">
+          <a href="https://stylevision.ai/terms" target="_blank" rel="noreferrer" className="hover:text-neutral-400 transition-colors">
+            Terms of Use
+          </a>
+          <span className="w-1 h-1 rounded-full bg-neutral-800"></span>
+          <a href="https://stylevision.ai/privacy" target="_blank" rel="noreferrer" className="hover:text-neutral-400 transition-colors">
+            Privacy Policy
+          </a>
+        </div>
+
       </div>
     </div>
   );
