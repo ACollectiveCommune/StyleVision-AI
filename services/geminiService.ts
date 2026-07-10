@@ -94,13 +94,6 @@ const applyDifferenceMask = async (originalSrc: string, generatedSrc: string, cu
       const nx = x / w;
       const ny = y / h;
 
-      // Classify spatial regions
-      const isHairRegion = (ny < 0.42) || (ellipseDistance > 0.85 && ny < 0.70);
-      const isBeardRegion = (ny >= 0.58) || (ny >= 0.45 && Math.abs(nx - 0.5) > 0.20);
-      
-      const isEyebrowsOrEyes = (nx >= 0.28 && nx <= 0.72) && (ny >= 0.34 && ny <= 0.50);
-      const isNose = (nx >= 0.38 && nx <= 0.62) && (ny >= 0.50 && ny <= 0.58);
-      const isLips = (nx >= 0.36 && nx <= 0.64) && (ny >= 0.60 && ny <= 0.72);
 
       if (ellipseDistance > 1.25 && isHairEdited) {
         // Hair is edited, and we are in the outer hair region: Use generated pixels directly
@@ -138,18 +131,6 @@ const applyDifferenceMask = async (originalSrc: string, generatedSrc: string, cu
         } else if (distLips < 1.0) {
           // Smoothly scale threshold up to 999 at the center of the lips
           currentThreshold = Math.round(32 + (999 - 32) * (1.0 - distLips));
-        } else if (isHairRegion && !isHairEdited) {
-          // Outer/upper hair is not edited: force preserve original
-          currentThreshold = 999;
-        } else if (isBeardRegion && !isBeardEdited) {
-          // Beard is not edited: force preserve original facial hair/skin details
-          currentThreshold = 999;
-        } else if (isBeardRegion && isBeardEdited) {
-          // Beard IS edited: set threshold to 0 to let the generated style/color
-          // edits pass through 100% without any original stubble restoration, 
-          // allowing the color to flow seamlessly from sideburns onto cheeks and mustache.
-          currentThreshold = 0;
-          currentFeather = 1;
         }
 
         if (colorDist < currentThreshold - currentFeather) {
