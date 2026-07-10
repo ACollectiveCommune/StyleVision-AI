@@ -72,19 +72,14 @@ export const incrementUserCredits = async (uid: string, amount: number): Promise
 
   if (!db) return nextCredits;
 
-  try {
-    const userDocRef = doc(db, "users", uid);
-    await setDoc(userDocRef, { credits: increment(amount) }, { merge: true });
-    
-    // Retrieve updated credit balance
-    const docSnap = await getDoc(userDocRef);
-    const dbCredits = docSnap.data()?.credits ?? nextCredits;
-    localStorage.setItem(`credits_${uid}`, dbCredits.toString());
-    return dbCredits;
-  } catch (err) {
-    console.warn("[BILLING LOG] Firestore write blocked (likely security rules). Using local storage fallback:", err);
-    return nextCredits;
-  }
+  // Run database update in the background without blocking the UI flow
+  const userDocRef = doc(db, "users", uid);
+  setDoc(userDocRef, { credits: increment(amount) }, { merge: true })
+    .catch((err) => {
+      console.warn("[BILLING LOG] Firestore credits write blocked (likely security rules):", err);
+    });
+
+  return nextCredits;
 };
 
 /**
