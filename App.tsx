@@ -128,6 +128,29 @@ const App: React.FC = () => {
   return (
     <div className="relative w-full h-screen bg-black overflow-hidden font-sans text-white select-none">
       
+      {/* --- Main Content Area --- */}
+      <div className="absolute inset-0 z-0">
+        {state.currentMode === AppMode.CAMERA && (
+          <CameraView 
+            isActive={state.currentMode === AppMode.CAMERA} 
+            onCapture={handleCapture} 
+          />
+        )}
+
+        {state.currentMode === AppMode.EDITOR && (
+          <PhotoEditor 
+            appState={state} 
+            onUpdateState={updateState} 
+          />
+        )}
+
+        {state.currentMode === AppMode.FAVORITES && (
+          <FavoritesView 
+            onLoadGeneration={handleLoadGeneration} 
+          />
+        )}
+      </div>
+
       {/* --- Top Bar (Transparent / Floating) --- */}
       <div className="absolute top-0 left-0 right-0 z-50 p-4 pt-safe-top flex justify-between items-center bg-gradient-to-b from-black/80 to-transparent">
         
@@ -187,29 +210,6 @@ const App: React.FC = () => {
           />
 
         </div>
-      </div>
-
-      {/* --- Main Content Area --- */}
-      <div className="absolute inset-0 z-0">
-        {state.currentMode === AppMode.CAMERA && (
-          <CameraView 
-            isActive={state.currentMode === AppMode.CAMERA} 
-            onCapture={handleCapture} 
-          />
-        )}
-
-        {state.currentMode === AppMode.EDITOR && (
-          <PhotoEditor 
-            appState={state} 
-            onUpdateState={updateState} 
-          />
-        )}
-
-        {state.currentMode === AppMode.FAVORITES && (
-          <FavoritesView 
-            onLoadGeneration={handleLoadGeneration} 
-          />
-        )}
       </div>
 
       {/* --- Bottom Navigation --- */}
