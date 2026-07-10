@@ -26,9 +26,10 @@ const applyDifferenceMask = async (originalSrc: string, generatedSrc: string, cu
     const isHairEdited = currentState.selectedHairStyle.id !== 'original' || currentState.selectedHairColor.id !== 'original';
     const isBeardStyleChanged = currentState.selectedBeardStyle.id !== 'original';
     const isBeardEdited = isBeardStyleChanged || currentState.selectedBeardColor.id !== 'original';
+    const isCustomPromptActive = !!currentState.customPrompt?.trim();
 
-    if (isHairEdited || isBeardEdited) {
-      console.log("[MASK LOG] Hair or Beard is edited. Bypassing difference mask to ensure maximum realism and seamless blending.");
+    if (isHairEdited || isBeardEdited || isCustomPromptActive) {
+      console.log("[MASK LOG] Hair/Beard edited or Custom Prompt active. Bypassing difference mask to ensure maximum realism.");
       return generatedSrc;
     }
 
@@ -272,59 +273,65 @@ export const generateStylePreview = async (
 
   promptParts.push("Modify the hair and facial hair in this photo according to the following specifications:");
 
-  // --- 1. HAIRSTYLE ---
-  const isHairStyleOriginal = selectedHairStyle.id === 'original';
-  if (isHairStyleOriginal) {
-    promptParts.push("- HAIRSTYLE: Do not change the hairstyle. Keep the hair length, shape, and cut exactly as it is in the original photo.");
+  const isCustomPromptActive = !!currentState.customPrompt?.trim();
+
+  if (isCustomPromptActive) {
+    promptParts.push(`- CUSTOM LOOK REQUEST: Modify the subject's hair, hair color, and/or facial hair to match the following custom look request: "${currentState.customPrompt.trim()}".`);
   } else {
-    const styleDesc = STYLE_PROMPTS[selectedHairStyle.id] || selectedHairStyle.label;
-    promptParts.push(`- HAIRSTYLE: Replace the current hair with a ${styleDesc}.`);
-  }
-
-  // --- 2. HAIR COLOR ---
-  const isHairColorOriginal = selectedHairColor.id === 'original';
-  if (isHairColorOriginal) {
-    promptParts.push("- HAIR COLOR: Do not change the hair color. Keep the original hair color exactly as it is.");
-  } else {
-    const colorDesc = COLOR_PROMPTS[selectedHairColor.id] || selectedHairColor.label;
-    promptParts.push(`- HAIR COLOR: Dye the hair on the head to a ${colorDesc} color. Ensure all hair strands are evenly dyed to this color.`);
-  }
-
-  // --- 3. FACIAL HAIR (BEARD / MUSTACHE) ---
-  if (gender === Gender.MALE) {
-    // Beard Style
-    const isBeardStyleOriginal = selectedBeardStyle.id === 'original';
-    const isCleanShaven = selectedBeardStyle.id === 'none';
-
-    if (isBeardStyleOriginal) {
-      promptParts.push("- BEARD STYLE: Do not change the beard style. Keep the original facial hair shape, density, or lack of facial hair exactly as it is.");
-    } else if (isCleanShaven) {
-      promptParts.push("- BEARD STYLE: Remove all facial hair completely. The subject must be clean-shaven (no mustache, no goatee, no beard, no stubble).");
+    // --- 1. HAIRSTYLE ---
+    const isHairStyleOriginal = selectedHairStyle.id === 'original';
+    if (isHairStyleOriginal) {
+      promptParts.push("- HAIRSTYLE: Do not change the hairstyle. Keep the hair length, shape, and cut exactly as it is in the original photo.");
     } else {
-      const styleDesc = STYLE_PROMPTS[selectedBeardStyle.id] || selectedBeardStyle.label;
-      promptParts.push(`- BEARD STYLE: Apply a ${styleDesc}. Remove any other facial hair that does not belong to this style.`);
+      const styleDesc = STYLE_PROMPTS[selectedHairStyle.id] || selectedHairStyle.label;
+      promptParts.push(`- HAIRSTYLE: Replace the current hair with a ${styleDesc}.`);
     }
 
-    // Beard Color (Only send if they are NOT clean-shaven!)
-    if (!isCleanShaven) {
-      const isBeardColorOriginal = selectedBeardColor.id === 'original';
-      if (isBeardColorOriginal) {
-        promptParts.push("- BEARD COLOR: Do not change the facial hair color. Keep the original mustache and beard color exactly as it is.");
-      } else if (selectedBeardColor.id === 'match') {
-        const targetColor = isHairColorOriginal ? "the original hair color" : `${COLOR_PROMPTS[selectedHairColor.id]} (matching the new hair color)`;
-        promptParts.push(`- BEARD COLOR: Dye the mustache and beard hair to ${targetColor}.`);
+    // --- 2. HAIR COLOR ---
+    const isHairColorOriginal = selectedHairColor.id === 'original';
+    if (isHairColorOriginal) {
+      promptParts.push("- HAIR COLOR: Do not change the hair color. Keep the original hair color exactly as it is.");
+    } else {
+      const colorDesc = COLOR_PROMPTS[selectedHairColor.id] || selectedHairColor.label;
+      promptParts.push(`- HAIR COLOR: Dye the hair on the head to a ${colorDesc} color. Ensure all hair strands are evenly dyed to this color.`);
+    }
+
+    // --- 3. FACIAL HAIR (BEARD / MUSTACHE) ---
+    if (gender === Gender.MALE) {
+      // Beard Style
+      const isBeardStyleOriginal = selectedBeardStyle.id === 'original';
+      const isCleanShaven = selectedBeardStyle.id === 'none';
+
+      if (isBeardStyleOriginal) {
+        promptParts.push("- BEARD STYLE: Do not change the beard style. Keep the original facial hair shape, density, or lack of facial hair exactly as it is.");
+      } else if (isCleanShaven) {
+        promptParts.push("- BEARD STYLE: Remove all facial hair completely. The subject must be clean-shaven (no mustache, no goatee, no beard, no stubble).");
       } else {
-        const colorDesc = COLOR_PROMPTS[selectedBeardColor.id] || selectedBeardColor.label;
-        promptParts.push(`- BEARD COLOR: Dye the mustache and beard hair to a ${colorDesc} color. Ensure all facial hair matches this exact color.`);
+        const styleDesc = STYLE_PROMPTS[selectedBeardStyle.id] || selectedBeardStyle.label;
+        promptParts.push(`- BEARD STYLE: Apply a ${styleDesc}. Remove any other facial hair that does not belong to this style.`);
       }
-    }
-  } else {
-    // Female Mode
-    const isBeardStyleOriginal = selectedBeardStyle.id === 'original';
-    if (isBeardStyleOriginal) {
-      promptParts.push("- FACIAL HAIR: Do not change the facial hair. Keep the original mustache, beard, stubble, or lack of facial hair exactly as it is.");
+
+      // Beard Color (Only send if they are NOT clean-shaven!)
+      if (!isCleanShaven) {
+        const isBeardColorOriginal = selectedBeardColor.id === 'original';
+        if (isBeardColorOriginal) {
+          promptParts.push("- BEARD COLOR: Do not change the facial hair color. Keep the original mustache and beard color exactly as it is.");
+        } else if (selectedBeardColor.id === 'match') {
+          const targetColor = isHairColorOriginal ? "the original hair color" : `${COLOR_PROMPTS[selectedHairColor.id]} (matching the new hair color)`;
+          promptParts.push(`- BEARD COLOR: Dye the mustache and beard hair to ${targetColor}.`);
+        } else {
+          const colorDesc = COLOR_PROMPTS[selectedBeardColor.id] || selectedBeardColor.label;
+          promptParts.push(`- BEARD COLOR: Dye the mustache and beard hair to a ${colorDesc} color. Ensure all facial hair matches this exact color.`);
+        }
+      }
     } else {
-      promptParts.push("- FACIAL HAIR: The face must remain completely clean-shaven with absolutely no mustache, stubble, or beard.");
+      // Female Mode
+      const isBeardStyleOriginal = selectedBeardStyle.id === 'original';
+      if (isBeardStyleOriginal) {
+        promptParts.push("- FACIAL HAIR: Do not change the facial hair. Keep the original mustache, beard, stubble, or lack of facial hair exactly as it is.");
+      } else {
+        promptParts.push("- FACIAL HAIR: The face must remain completely clean-shaven with absolutely no mustache, stubble, or beard.");
+      }
     }
   }
 

@@ -20,6 +20,7 @@ const App: React.FC = () => {
     selectedBeardStyle: BEARD_STYLES[0],
     selectedBeardColor: BEARD_COLORS[0],
     isProcessing: false,
+    customPrompt: '',
   });
 
   const [currentUser, setCurrentUser] = useState<User | null>(null);
@@ -62,6 +63,7 @@ const App: React.FC = () => {
       selectedHairColor: HAIR_COLORS[0],
       selectedBeardStyle: BEARD_STYLES[0],
       selectedBeardColor: BEARD_COLORS[0],
+      customPrompt: '',
     });
   };
 
@@ -79,6 +81,7 @@ const App: React.FC = () => {
           selectedHairColor: HAIR_COLORS[0],
           selectedBeardStyle: BEARD_STYLES[0],
           selectedBeardColor: BEARD_COLORS[0],
+          customPrompt: '',
         });
       };
       reader.readAsDataURL(file);
@@ -94,6 +97,7 @@ const App: React.FC = () => {
       selectedHairColor: HAIR_COLORS[0],
       selectedBeardStyle: BEARD_STYLES[0],
       selectedBeardColor: BEARD_COLORS[0],
+      customPrompt: '',
     });
   };
 
@@ -106,7 +110,8 @@ const App: React.FC = () => {
       selectedHairColor: { id: generation.hairColor, label: generation.hairColor, category: 'hair', type: 'color' },
       selectedBeardStyle: { id: generation.beardStyle, label: generation.beardStyle, category: 'beard', type: 'style' },
       selectedBeardColor: { id: generation.beardColor, label: generation.beardColor, category: 'beard', type: 'color' },
-      currentMode: AppMode.EDITOR
+      currentMode: AppMode.EDITOR,
+      customPrompt: '',
     });
   };
 

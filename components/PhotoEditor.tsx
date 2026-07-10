@@ -46,7 +46,7 @@ export const PhotoEditor: React.FC<PhotoEditorProps> = ({ appState, onUpdateStat
   const [showOriginal, setShowOriginal] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [isControlsVisible, setIsControlsVisible] = useState(true);
-  const [activeTab, setActiveTab] = useState<'hair' | 'beard'>('hair');
+  const [activeTab, setActiveTab] = useState<'hair' | 'beard' | 'prompt'>('hair');
 
   // Firestore sync state
   const [currentDocId, setCurrentDocId] = useState<string | null>(null);
@@ -256,24 +256,25 @@ export const PhotoEditor: React.FC<PhotoEditorProps> = ({ appState, onUpdateStat
             <div className="w-12 h-1 bg-white/20 rounded-full group-hover:bg-white/40 transition-colors"></div>
           </div>
 
-          {/* Tab Selection (only for Males, as Females don't have Beard category) */}
-          {appState.gender === Gender.MALE ? (
-            <div className="flex justify-center border-b border-white/5 px-4 mb-2">
-              <button
-                type="button"
-                onClick={() => setActiveTab('hair')}
-                className={`px-8 py-2 text-[10px] font-extrabold uppercase tracking-widest border-b-2 transition-all ${
-                  activeTab === 'hair' 
-                    ? 'text-white border-white' 
-                    : 'text-white/40 border-transparent hover:text-white/60'
-                }`}
-              >
-                Hair Options
-              </button>
+          {/* Tab Selection */}
+          <div className="flex justify-center border-b border-white/5 px-4 mb-2">
+            <button
+              type="button"
+              onClick={() => setActiveTab('hair')}
+              className={`px-4 py-2 text-[10px] font-extrabold uppercase tracking-widest border-b-2 transition-all ${
+                activeTab === 'hair' 
+                  ? 'text-white border-white' 
+                  : 'text-white/40 border-transparent hover:text-white/60'
+              }`}
+            >
+              Hair Options
+            </button>
+            
+            {appState.gender === Gender.MALE && (
               <button
                 type="button"
                 onClick={() => setActiveTab('beard')}
-                className={`px-8 py-2 text-[10px] font-extrabold uppercase tracking-widest border-b-2 transition-all ${
+                className={`px-4 py-2 text-[10px] font-extrabold uppercase tracking-widest border-b-2 transition-all ${
                   activeTab === 'beard' 
                     ? 'text-white border-white' 
                     : 'text-white/40 border-transparent hover:text-white/60'
@@ -281,17 +282,23 @@ export const PhotoEditor: React.FC<PhotoEditorProps> = ({ appState, onUpdateStat
               >
                 Beard Options
               </button>
-            </div>
-          ) : (
-            /* Simple Hair Header for females */
-            <div className="flex items-center px-4 mb-2 mt-1">
-              <span className="text-[10px] font-bold text-white/70 uppercase tracking-widest mr-2">Hair Options</span>
-              <div className="h-px bg-white/10 flex-grow"></div>
-            </div>
-          )}
+            )}
+
+            <button
+              type="button"
+              onClick={() => setActiveTab('prompt')}
+              className={`px-4 py-2 text-[10px] font-extrabold uppercase tracking-widest border-b-2 transition-all ${
+                activeTab === 'prompt' 
+                  ? 'text-white border-white' 
+                  : 'text-white/40 border-transparent hover:text-white/60'
+              }`}
+            >
+              AI Custom Look
+            </button>
+          </div>
 
           {/* Active Tab Panel */}
-          {activeTab === 'hair' || appState.gender !== Gender.MALE ? (
+          {activeTab === 'hair' && (
             /* Hair Tab Panel */
             <div className="w-full animate-in fade-in duration-200">
               {/* Hair Styles Row */}
@@ -300,8 +307,11 @@ export const PhotoEditor: React.FC<PhotoEditorProps> = ({ appState, onUpdateStat
                    <StyleButton 
                      key={s.id} 
                      item={s} 
-                     isSelected={appState.selectedHairStyle?.id === s.id} 
-                     onClick={() => handleSelectStyle(s)} 
+                     isSelected={appState.selectedHairStyle?.id === s.id && !appState.customPrompt} 
+                     onClick={() => {
+                       onUpdateState({ customPrompt: '' });
+                       handleSelectStyle(s);
+                     }} 
                    />
                 ))}
               </div>
@@ -312,13 +322,18 @@ export const PhotoEditor: React.FC<PhotoEditorProps> = ({ appState, onUpdateStat
                   <ColorButton
                     key={c.id}
                     item={c}
-                    isSelected={appState.selectedHairColor?.id === c.id}
-                    onClick={() => handleSelectStyle(c)}
+                    isSelected={appState.selectedHairColor?.id === c.id && !appState.customPrompt}
+                    onClick={() => {
+                      onUpdateState({ customPrompt: '' });
+                      handleSelectStyle(c);
+                    }}
                   />
                 ))}
               </div>
             </div>
-          ) : (
+          )}
+
+          {activeTab === 'beard' && appState.gender === Gender.MALE && (
             /* Beard Tab Panel */
             <div className="w-full animate-in fade-in duration-200">
               {/* Beard Styles Row */}
@@ -327,8 +342,11 @@ export const PhotoEditor: React.FC<PhotoEditorProps> = ({ appState, onUpdateStat
                   <StyleButton 
                     key={b.id} 
                     item={b} 
-                    isSelected={appState.selectedBeardStyle?.id === b.id} 
-                    onClick={() => handleSelectStyle(b)} 
+                    isSelected={appState.selectedBeardStyle?.id === b.id && !appState.customPrompt} 
+                    onClick={() => {
+                      onUpdateState({ customPrompt: '' });
+                      handleSelectStyle(b);
+                    }} 
                   />
                 ))}
               </div>
@@ -339,10 +357,61 @@ export const PhotoEditor: React.FC<PhotoEditorProps> = ({ appState, onUpdateStat
                    <ColorButton
                      key={c.id}
                      item={c}
-                     isSelected={appState.selectedBeardColor?.id === c.id}
-                     onClick={() => handleSelectStyle(c)}
+                     isSelected={appState.selectedBeardColor?.id === c.id && !appState.customPrompt}
+                     onClick={() => {
+                       onUpdateState({ customPrompt: '' });
+                       handleSelectStyle(c);
+                     }}
                    />
                 ))}
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'prompt' && (
+            /* AI Custom Look / Prompt Panel */
+            <div className="w-full animate-in fade-in duration-200 px-4">
+              {/* Suggestion Chips */}
+              <div className="flex overflow-x-auto no-scrollbar space-x-2 pb-2 pt-0.5 scroll-smooth mb-1">
+                {['1970s Disco', '90s Rockstar', 'Cyberpunk Glow', 'Viking Warrior', 'Anime Spiky Hair', '1920s Gangster', 'Elven Braids', 'Neon Pink Highlights'].map(tag => (
+                  <button
+                    key={tag}
+                    type="button"
+                    onClick={() => {
+                      onUpdateState({ customPrompt: tag });
+                    }}
+                    className={`px-3 py-1 rounded-full text-[9px] font-bold tracking-wide border transition-all duration-300 active:scale-95 flex-shrink-0 ${
+                      appState.customPrompt === tag
+                        ? 'bg-white/20 text-white border-white/40 shadow-sm'
+                        : 'bg-white/5 text-white/50 border-white/10 hover:text-white/80 hover:bg-white/10'
+                    }`}
+                  >
+                    {tag}
+                  </button>
+                ))}
+              </div>
+
+              {/* Text Input Bar */}
+              <div className="relative flex items-center bg-white/5 rounded-xl border border-white/10 px-3 py-2 shadow-inner focus-within:border-white/30 transition-all">
+                <input
+                  type="text"
+                  value={appState.customPrompt || ''}
+                  onChange={(e) => onUpdateState({ customPrompt: e.target.value })}
+                  placeholder="Describe a look (e.g. '1970s mullet with blonde highlights')"
+                  className="w-full bg-transparent border-none outline-none text-white text-xs placeholder-white/25 pr-8"
+                />
+                {appState.customPrompt && (
+                  <button
+                    type="button"
+                    onClick={() => onUpdateState({ customPrompt: '' })}
+                    className="absolute right-3 text-white/40 hover:text-white active:scale-90 transition-transform"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <line x1="18" y1="6" x2="6" y2="18"></line>
+                      <line x1="6" y1="6" x2="18" y2="18"></line>
+                    </svg>
+                  </button>
+                )}
               </div>
             </div>
           )}

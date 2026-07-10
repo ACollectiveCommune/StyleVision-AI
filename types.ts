@@ -26,4 +26,5 @@ export interface AppState {
   selectedBeardStyle: StyleOption | null;
   selectedBeardColor: StyleOption | null;
   isProcessing: boolean;
+  customPrompt?: string;
 }
