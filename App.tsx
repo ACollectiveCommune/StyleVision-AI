@@ -5,6 +5,7 @@ import { PhotoEditor } from './components/PhotoEditor';
 import { BottomNav } from './components/BottomNav';
 import { LoginView } from './components/LoginView';
 import { FavoritesView } from './components/FavoritesView';
+import { PaywallView } from './components/PaywallView';
 import { Icons, HAIR_STYLES_MALE, HAIR_STYLES_FEMALE, HAIR_COLORS, BEARD_STYLES, BEARD_COLORS } from './constants';
 import { auth, logout, onAuthStateChanged, SavedGeneration } from './services/firebase';
 import { subscribeToSubscription, getGenerationCount } from './services/billingService';
@@ -33,6 +34,7 @@ const App: React.FC = () => {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [authChecked, setAuthChecked] = useState(false);
   const [isAuthenticating, setIsAuthenticating] = useState(false);
+  const [showOnboardingPaywall, setShowOnboardingPaywall] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -65,12 +67,20 @@ const App: React.FC = () => {
               premiumChecked: true,
               generationCount: genCount
             });
+            if (isPremium) {
+              setShowOnboardingPaywall(false);
+            } else {
+              setShowOnboardingPaywall(true);
+            }
           });
           billingUnsubscribeRef.current = unsubBilling;
 
           // Initialize native Apple App Store billing listeners (on iOS)
           initializeBilling(user.uid, (isPremium) => {
             updateState({ isPremium, premiumChecked: true });
+            if (isPremium) {
+              setShowOnboardingPaywall(false);
+            }
           });
         } catch (err) {
           console.error("Error setting up user billing data:", err);
@@ -86,6 +96,7 @@ const App: React.FC = () => {
           premiumChecked: true,
           generationCount: 0
         });
+        setShowOnboardingPaywall(false);
       }
       setAuthChecked(true);
     });
@@ -247,16 +258,12 @@ const App: React.FC = () => {
         
         {/* Branding & Signout */}
         <div className="flex items-center gap-2.5">
-          <button
-            onClick={() => setShowAccountModal(true)}
-            className="flex items-center gap-2 focus:outline-none active:scale-[0.98] transition-transform"
-            title="View Account Details"
-          >
+          <div className="flex items-center gap-2">
             <div className="w-8 h-8 rounded-xl bg-white/10 backdrop-blur-md border border-white/10 flex items-center justify-center font-bold text-xs shadow-lg">
               <span className="bg-gradient-to-tr from-indigo-400 to-purple-400 bg-clip-text text-transparent">SV</span>
             </div>
             <span className="font-bold tracking-tight text-lg drop-shadow-md text-white/90">StyleVision</span>
-          </button>
+          </div>
           
           {/* Sign Out Button */}
           <button
@@ -319,8 +326,21 @@ const App: React.FC = () => {
           <button 
              onClick={() => fileInputRef.current?.click()}
              className="w-8 h-8 flex items-center justify-center bg-black/40 rounded-full backdrop-blur-xl border border-white/10 shadow-lg active:scale-95 transition-transform"
+             title="Choose from Gallery"
           >
             <Icons.Album />
+          </button>
+
+          {/* Settings Button */}
+          <button 
+             onClick={() => setShowAccountModal(true)}
+             className="w-8 h-8 flex items-center justify-center bg-black/40 rounded-full backdrop-blur-xl border border-white/10 shadow-lg active:scale-95 transition-transform text-white/80 hover:text-white"
+             title="Settings"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="12" cy="12" r="3"></circle>
+              <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+            </svg>
           </button>
           <input 
             type="file" 
@@ -434,6 +454,15 @@ const App: React.FC = () => {
             </div>
           </div>
         </div>
+      )}
+
+      {/* --- Onboarding Paywall Overlay --- */}
+      {showOnboardingPaywall && currentUser && (
+        <PaywallView 
+          uid={currentUser.uid} 
+          onContinueFree={() => setShowOnboardingPaywall(false)}
+          onUpgradeSuccess={() => setShowOnboardingPaywall(false)}
+        />
       )}
 
     </div>

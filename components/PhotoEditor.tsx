@@ -286,6 +286,28 @@ export const PhotoEditor: React.FC<PhotoEditorProps> = ({ appState, onUpdateStat
             <div className="w-12 h-1 bg-white/20 rounded-full group-hover:bg-white/40 transition-colors"></div>
           </div>
 
+          {/* Persistent Upgrade Banner for Free Users */}
+          {!appState.isPremium && (
+            <div className="px-4 py-2.5 mx-4 my-1.5 rounded-2xl bg-gradient-to-r from-indigo-500/20 to-purple-500/20 border border-indigo-500/30 flex justify-between items-center shadow-lg">
+              <div className="flex items-center gap-2 text-left">
+                <div className="w-6 h-6 rounded-lg bg-indigo-500/20 flex items-center justify-center text-indigo-400 flex-shrink-0">
+                  <Icons.Magic className="w-3.5 h-3.5" />
+                </div>
+                <div className="flex flex-col">
+                  <span className="text-[10px] font-extrabold uppercase tracking-wider text-white">StyleVision Pro</span>
+                  <span className="text-[9px] text-neutral-400 font-bold leading-none mt-0.5">{appState.generationCount}/3 Free attempts used</span>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowUpgradeModal(true)}
+                className="px-3 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-[9px] font-extrabold uppercase tracking-widest text-white shadow-sm active:scale-95 transition-transform"
+              >
+                Go Pro
+              </button>
+            </div>
+          )}
+
           {/* Tab Selection */}
           <div className="flex justify-center border-b border-black/30 px-4 mb-2">
             <button
