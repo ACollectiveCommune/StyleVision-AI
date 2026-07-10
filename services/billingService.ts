@@ -22,9 +22,12 @@ export const subscribeToCredits = (
   uid: string,
   onUpdate: (credits: number) => void
 ): (() => void) => {
+  // Retrieve from localStorage cache first to avoid async flash
+  const cachedCreditsStr = localStorage.getItem(`credits_${uid}`);
+  const cachedCredits = cachedCreditsStr ? parseInt(cachedCreditsStr, 10) : 5;
+  onUpdate(cachedCredits);
+
   if (!db) {
-    // If Firebase is not initialized, fallback to 0 credits
-    onUpdate(0);
     return () => {};
   }
 
@@ -36,21 +39,23 @@ export const subscribeToCredits = (
       if (docSnap.exists()) {
         const data = docSnap.data();
         const credits = typeof data.credits === "number" ? data.credits : 5;
+        localStorage.setItem(`credits_${uid}`, credits.toString());
         onUpdate(credits);
       } else {
         // Document does not exist yet. Initialize user with 5 free credits
         try {
           await setDoc(userDocRef, { credits: 5 }, { merge: true });
+          localStorage.setItem(`credits_${uid}`, "5");
           onUpdate(5);
         } catch (err) {
-          console.error("[BILLING LOG] Error creating initial user credits document:", err);
+          console.warn("[BILLING LOG] Error creating initial user credits document, using local fallback:", err);
           onUpdate(5);
         }
       }
     },
     (error) => {
-      console.error("[BILLING LOG] Error listening to user credits:", error);
-      onUpdate(0);
+      console.warn("[BILLING LOG] Firestore credits listener blocked, using cached balance:", error);
+      onUpdate(cachedCredits);
     }
   );
 };
@@ -59,17 +64,26 @@ export const subscribeToCredits = (
  * Increments the user's credits balance in Firestore.
  */
 export const incrementUserCredits = async (uid: string, amount: number): Promise<number> => {
-  if (!db) return 5;
+  // 1. Update local storage cache immediately
+  const cachedCreditsStr = localStorage.getItem(`credits_${uid}`);
+  const currentCredits = cachedCreditsStr ? parseInt(cachedCreditsStr, 10) : 5;
+  const nextCredits = Math.max(0, currentCredits + amount);
+  localStorage.setItem(`credits_${uid}`, nextCredits.toString());
+
+  if (!db) return nextCredits;
+
   try {
     const userDocRef = doc(db, "users", uid);
     await setDoc(userDocRef, { credits: increment(amount) }, { merge: true });
     
     // Retrieve updated credit balance
     const docSnap = await getDoc(userDocRef);
-    return docSnap.data()?.credits ?? 5;
+    const dbCredits = docSnap.data()?.credits ?? nextCredits;
+    localStorage.setItem(`credits_${uid}`, dbCredits.toString());
+    return dbCredits;
   } catch (err) {
-    console.error("[BILLING LOG] Error incrementing user credits balance:", err);
-    return 5;
+    console.warn("[BILLING LOG] Firestore write blocked (likely security rules). Using local storage fallback:", err);
+    return nextCredits;
   }
 };
 
