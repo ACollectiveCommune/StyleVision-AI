@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { AppState, StyleOption, Gender } from '../types';
+import { AppState, StyleOption, Gender, AppMode } from '../types';
 import { Icons, HAIR_STYLES_MALE, HAIR_STYLES_FEMALE, BEARD_STYLES, HAIR_COLORS, BEARD_COLORS, StyleIllustration } from '../constants';
 import { generateStylePreview } from '../services/geminiService';
 import { auth, saveGeneration, uploadImageToStorage, toggleFavorite } from '../services/firebase';
