@@ -1,12 +1,19 @@
 import React, { useState } from 'react';
 
 interface LegalDocumentsModalProps {
-  initialTab?: 'terms' | 'privacy';
+  initialTab?: 'terms' | 'privacy' | 'account';
   onClose: () => void;
+  onDeleteAccount?: () => void;
+  isBillingPortalLoading?: boolean;
 }
 
-export const LegalDocumentsModal: React.FC<LegalDocumentsModalProps> = ({ initialTab = 'terms', onClose }) => {
-  const [activeTab, setActiveTab] = useState<'terms' | 'privacy'>(initialTab);
+export const LegalDocumentsModal: React.FC<LegalDocumentsModalProps> = ({ 
+  initialTab = 'terms', 
+  onClose,
+  onDeleteAccount,
+  isBillingPortalLoading = false
+}) => {
+  const [activeTab, setActiveTab] = useState<'terms' | 'privacy' | 'account'>(initialTab);
 
   return (
     <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/80 backdrop-blur-md p-4 pointer-events-auto">
@@ -22,7 +29,7 @@ export const LegalDocumentsModal: React.FC<LegalDocumentsModalProps> = ({ initia
                 : 'text-neutral-500 hover:text-neutral-300'
             }`}
           >
-            Terms of Use (EULA)
+            Terms (EULA)
           </button>
           <button
             onClick={() => setActiveTab('privacy')}
@@ -32,13 +39,23 @@ export const LegalDocumentsModal: React.FC<LegalDocumentsModalProps> = ({ initia
                 : 'text-neutral-500 hover:text-neutral-300'
             }`}
           >
-            Privacy Policy
+            Privacy
+          </button>
+          <button
+            onClick={() => setActiveTab('account')}
+            className={`flex-1 py-4 text-[10px] font-black uppercase tracking-widest transition-all ${
+              activeTab === 'account' 
+                ? 'text-indigo-400 border-b-2 border-indigo-500 bg-white/5' 
+                : 'text-neutral-500 hover:text-neutral-300'
+            }`}
+          >
+            Account
           </button>
         </div>
 
         {/* Scrollable Content Container */}
         <div className="flex-1 overflow-y-auto p-6 space-y-4 text-[11px] text-neutral-300 leading-relaxed font-medium">
-          {activeTab === 'terms' ? (
+          {activeTab === 'terms' && (
             <div className="space-y-4">
               <h3 className="text-xs font-black uppercase tracking-wider text-white">End User License Agreement (EULA)</h3>
               <p className="text-[10px] text-neutral-500">Last updated: July 2026</p>
@@ -82,7 +99,9 @@ export const LegalDocumentsModal: React.FC<LegalDocumentsModalProps> = ({ initia
                 </p>
               </div>
             </div>
-          ) : (
+          )}
+
+          {activeTab === 'privacy' && (
             <div className="space-y-4">
               <h3 className="text-xs font-black uppercase tracking-wider text-white">Privacy Policy</h3>
               <p className="text-[10px] text-neutral-500">Last updated: July 2026</p>
@@ -118,6 +137,47 @@ export const LegalDocumentsModal: React.FC<LegalDocumentsModalProps> = ({ initia
                   We implement industry-standard encryption protocols to protect your credentials and data transfers.
                 </p>
               </div>
+            </div>
+          )}
+
+          {activeTab === 'account' && (
+            <div className="space-y-6 text-center py-4">
+              <div className="w-12 h-12 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center font-bold text-md mx-auto shadow-lg">
+                <span className="bg-gradient-to-tr from-indigo-400 to-purple-400 bg-clip-text text-transparent">SV</span>
+              </div>
+              <div className="space-y-1">
+                <h3 className="text-xs font-black uppercase tracking-wider text-white">Manage Account Data</h3>
+                <p className="text-[10px] text-neutral-400">Request account closure & personal data erasure</p>
+              </div>
+
+              <div className="bg-white/5 rounded-2xl p-4 border border-white/5 text-left space-y-2 font-normal">
+                <p className="text-[10px] text-neutral-300 leading-relaxed">
+                  When you delete your StyleVision account, we permanently erase:
+                </p>
+                <ul className="list-disc pl-4 space-y-1 text-[10px] text-neutral-400">
+                  <li>Your Firebase Authentication profile</li>
+                  <li>All saved hairstyle & beard favorite generations</li>
+                  <li>Your Firestore database user document</li>
+                  <li>Uploaded preview images and face assets</li>
+                </ul>
+                <p className="text-[9px] text-red-400 font-bold uppercase pt-1">
+                  ⚠️ Warning: This action is permanent and cannot be undone.
+                </p>
+              </div>
+
+              {onDeleteAccount ? (
+                <button
+                  onClick={onDeleteAccount}
+                  disabled={isBillingPortalLoading}
+                  className="w-full py-3 rounded-xl bg-red-950/40 hover:bg-red-950/60 border border-red-500/20 font-extrabold text-[10px] uppercase tracking-widest text-red-400 hover:text-red-300 transition-all active:scale-[0.98]"
+                >
+                  {isBillingPortalLoading ? "Deleting Profile..." : "Permanently Delete Account"}
+                </button>
+              ) : (
+                <p className="text-[10px] text-neutral-400 italic">
+                  Guest accounts cannot delete records. Register an account to manage data.
+                </p>
+              )}
             </div>
           )}
         </div>

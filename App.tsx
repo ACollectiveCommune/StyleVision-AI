@@ -121,7 +121,7 @@ const App: React.FC = () => {
 
   const [showSideMenu, setShowSideMenu] = useState(false);
   const [isBillingPortalLoading, setIsBillingPortalLoading] = useState(false);
-  const [legalTab, setLegalTab] = useState<'terms' | 'privacy' | null>(null);
+  const [legalTab, setLegalTab] = useState<'terms' | 'privacy' | 'account' | null>(null);
   const [showHowItWorks, setShowHowItWorks] = useState(false);
 
   const handleAdCompleted = async () => {
@@ -487,6 +487,13 @@ const App: React.FC = () => {
                 >
                   Privacy Policy
                 </button>
+
+                <button
+                  onClick={() => setLegalTab('account')}
+                  className="w-full py-3 px-4 rounded-xl border border-white/5 hover:border-white/10 text-left font-extrabold text-[10px] uppercase tracking-widest text-white/70 hover:text-white transition-all"
+                >
+                  Account Data Settings
+                </button>
               </nav>
             </div>
 
@@ -500,14 +507,6 @@ const App: React.FC = () => {
                 className="w-full py-2.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/5 font-extrabold text-[9px] uppercase tracking-widest text-white/80 transition-all active:scale-[0.98]"
               >
                 Sign Out
-              </button>
-
-              <button
-                onClick={handleDeleteAccount}
-                disabled={isBillingPortalLoading}
-                className="w-full py-2.5 rounded-xl bg-red-950/20 hover:bg-red-950/30 border border-red-500/10 font-extrabold text-[9px] uppercase tracking-widest text-red-500 hover:text-red-400 transition-all active:scale-[0.98]"
-              >
-                Delete Account
               </button>
 
               <div className="text-center text-[8px] font-black uppercase tracking-widest text-neutral-600 pt-1 leading-none">
@@ -541,6 +540,8 @@ const App: React.FC = () => {
         <LegalDocumentsModal 
           initialTab={legalTab} 
           onClose={() => setLegalTab(null)} 
+          onDeleteAccount={handleDeleteAccount}
+          isBillingPortalLoading={isBillingPortalLoading}
         />
       )}
 
