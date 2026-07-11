@@ -182,17 +182,21 @@ export const loginWithApple = async () => {
 };
 
 export const logout = async () => {
+  // Trigger local auth change notify instantly to ensure immediate UI redirect to Login page
+  notifyAuthChange(null);
+
   if (isFirebaseEnabled) {
     try {
       if (Capacitor.isNativePlatform()) {
-        await FirebaseAuthentication.signOut();
+        FirebaseAuthentication.signOut()
+          .catch(e => console.warn("Native FirebaseAuthentication.signOut failed:", e));
       }
-      await signOut(auth);
+      signOut(auth)
+        .catch(e => console.warn("Web auth.signOut failed:", e));
     } catch (e) {
-      console.error("Firebase signOut failed:", e);
+      console.warn("Background signOut orchestration failed:", e);
     }
   }
-  notifyAuthChange(null);
 };
 
 /**
