@@ -322,24 +322,8 @@ const App: React.FC = () => {
           <span className="font-bold tracking-tight text-lg drop-shadow-md text-white/90">StyleVision</span>
         </div>
 
-        {/* Controls: Gender & Album */}
-        <div className="flex items-center gap-3">
-          
-          {/* Gender Selector Segmented Control */}
-          <div className="flex items-center bg-black/40 backdrop-blur-xl rounded-full p-0.5 border border-white/10 shadow-lg">
-            <button 
-              onClick={() => setGender(Gender.MALE)}
-              className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider transition-all duration-300 active:scale-95 ${state.gender === Gender.MALE ? 'bg-white/10 text-white shadow-sm font-extrabold' : 'text-white/40'}`}
-            >
-              Male
-            </button>
-            <button 
-              onClick={() => setGender(Gender.FEMALE)}
-              className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider transition-all duration-300 active:scale-95 ${state.gender === Gender.FEMALE ? 'bg-white/10 text-white shadow-sm font-extrabold' : 'text-white/40'}`}
-            >
-              Female
-            </button>
-          </div>
+        {/* Controls: Album & Credits */}
+        <div className="flex items-center gap-2">
 
           {/* Credits Balance Badge */}
           <button

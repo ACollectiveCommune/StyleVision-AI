@@ -207,6 +207,19 @@ export const PhotoEditor: React.FC<PhotoEditorProps> = ({ uid, appState, onUpdat
     }
   };
 
+  const setGender = (targetGender: Gender) => {
+    if (appState.gender === targetGender) return;
+    const hairStylesList = targetGender === Gender.MALE ? HAIR_STYLES_MALE : HAIR_STYLES_FEMALE;
+    onUpdateState({ 
+      gender: targetGender,
+      selectedHairStyle: hairStylesList[0],
+      selectedHairColor: HAIR_COLORS[0],
+      selectedBeardStyle: BEARD_STYLES[0],
+      selectedBeardColor: BEARD_COLORS[0],
+      customPrompt: '',
+    });
+  };
+
 
   const activeImage = showOriginal ? appState.originalImage : (appState.currentImage || appState.originalImage);
   const hairStyles = appState.gender === Gender.MALE ? HAIR_STYLES_MALE : HAIR_STYLES_FEMALE;
@@ -322,6 +335,26 @@ export const PhotoEditor: React.FC<PhotoEditorProps> = ({ uid, appState, onUpdat
               </div>
             </div>
           )}
+
+          {/* Gender Selector Inside Editor */}
+          <div className="flex justify-center mb-3">
+            <div className="flex items-center bg-black/40 backdrop-blur-xl rounded-full p-0.5 border border-white/10 shadow-lg">
+              <button 
+                type="button"
+                onClick={() => setGender(Gender.MALE)}
+                className={`px-4 py-1.5 rounded-full text-[9px] font-black uppercase tracking-widest transition-all duration-200 active:scale-95 ${appState.gender === Gender.MALE ? 'bg-white/10 text-white shadow-sm' : 'text-white/40'}`}
+              >
+                Male
+              </button>
+              <button 
+                type="button"
+                onClick={() => setGender(Gender.FEMALE)}
+                className={`px-4 py-1.5 rounded-full text-[9px] font-black uppercase tracking-widest transition-all duration-200 active:scale-95 ${appState.gender === Gender.FEMALE ? 'bg-white/10 text-white shadow-sm' : 'text-white/40'}`}
+              >
+                Female
+              </button>
+            </div>
+          </div>
 
           {/* Tab Selection */}
           <div className="flex justify-center border-b border-black/30 px-4 mb-2">
