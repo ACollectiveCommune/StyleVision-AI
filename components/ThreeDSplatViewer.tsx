@@ -499,13 +499,104 @@ export const ThreeDSplatViewer: React.FC<ThreeDSplatViewerProps> = ({
         const sinPhi = Math.sin(phi);
         const cosPhi = Math.cos(phi);
 
-        const scaleZ = 2.0;
-        const scaleX = 2.0;
-        const scaleY = -2.8;
+        let scaleX = 2.0;
+        let scaleY = -2.8;
+        let scaleZ = 2.0;
 
-        const x = scaleX * sinTheta * sinPhi;
-        const y = scaleY * cosTheta;
-        const z = scaleZ * sinTheta * cosPhi;
+        let x = scaleX * sinTheta * sinPhi;
+        let y = scaleY * cosTheta;
+        let z = scaleZ * sinTheta * cosPhi;
+
+        const isFront = z > 0;
+
+        if (isFront) {
+          // 1. Protrude the nose bridge and tip
+          const latDistToNose = Math.abs(lat / lats - 0.45);
+          const lonDistToCenter = Math.abs(lon / lons - 0.5);
+
+          if (latDistToNose < 0.15 && lonDistToCenter < 0.08) {
+            const factor = (0.15 - latDistToNose) * (0.08 - lonDistToCenter) * 80.0;
+            z += factor * 0.45;
+          }
+
+          // 2. Indent the Eye Sockets
+          const latDistToEyes = Math.abs(lat / lats - 0.38);
+          const lonDistToLeftEye = Math.abs(lon / lons - 0.43);
+          const lonDistToRightEye = Math.abs(lon / lons - 0.57);
+
+          if (latDistToEyes < 0.08) {
+            if (lonDistToLeftEye < 0.06) {
+              const factor = (0.08 - latDistToEyes) * (0.06 - lonDistToLeftEye) * 70.0;
+              z -= factor * 0.25;
+            }
+            if (lonDistToRightEye < 0.06) {
+              const factor = (0.08 - latDistToEyes) * (0.06 - lonDistToRightEye) * 70.0;
+              z -= factor * 0.25;
+            }
+          }
+
+          // 3. Define the Jawline & Chin protrusion
+          const latDistToChin = Math.abs(lat / lats - 0.72);
+          if (latDistToChin < 0.12 && lonDistToCenter < 0.10) {
+            const factor = (0.12 - latDistToChin) * (0.10 - lonDistToCenter) * 45.0;
+            z += factor * 0.20;
+            y += factor * 0.05;
+          }
+
+          // 4. Define Cheekbones
+          const latDistToCheeks = Math.abs(lat / lats - 0.52);
+          const lonDistToLeftCheek = Math.abs(lon / lons - 0.38);
+          const lonDistToRightCheek = Math.abs(lon / lons - 0.62);
+
+          if (latDistToCheeks < 0.10) {
+            if (lonDistToLeftCheek < 0.08) {
+              const factor = (0.10 - latDistToCheeks) * (0.08 - lonDistToLeftCheek) * 40.0;
+              z += factor * 0.12;
+              x -= factor * 0.05;
+            }
+            if (lonDistToRightCheek < 0.08) {
+              const factor = (0.10 - latDistToCheeks) * (0.08 - lonDistToRightCheek) * 40.0;
+              z += factor * 0.12;
+              x += factor * 0.05;
+            }
+          }
+        }
+
+        // 5. Add protruding Ears
+        const latDistToEars = Math.abs(lat / lats - 0.48);
+        const lonDistToLeftEar = Math.abs(lon / lons - 0.23);
+        const lonDistToRightEar = Math.abs(lon / lons - 0.77);
+
+        if (latDistToEars < 0.12) {
+          if (lonDistToLeftEar < 0.08) {
+            const factor = (0.12 - latDistToEars) * (0.08 - lonDistToLeftEar) * 60.0;
+            x -= factor * 0.25;
+            z -= factor * 0.08;
+          }
+          if (lonDistToRightEar < 0.08) {
+            const factor = (0.12 - latDistToEars) * (0.08 - lonDistToRightEar) * 60.0;
+            x += factor * 0.25;
+            z -= factor * 0.08;
+          }
+        }
+
+        // 6. Transition to Neck and flare shoulders
+        if (lat / lats > 0.82) {
+          const neckFactor = (lat / lats - 0.82) / 0.18;
+          const targetNeckRadius = 1.35;
+          const currentRadius = Math.sqrt(x*x + z*z);
+          if (currentRadius > 0.01) {
+            const ratio = (currentRadius * (1 - neckFactor) + targetNeckRadius * neckFactor) / currentRadius;
+            x *= ratio;
+            z *= ratio;
+          }
+          if (lat / lats > 0.95) {
+            const shoulderFactor = (lat / lats - 0.95) / 0.05;
+            x *= (1.0 + shoulderFactor * 0.65);
+            z *= (1.0 + shoulderFactor * 0.25);
+            y += shoulderFactor * 0.1;
+          }
+        }
 
         vertices.push(x, y, z);
 
