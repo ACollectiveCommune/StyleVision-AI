@@ -825,6 +825,21 @@ const App: React.FC = () => {
             <CameraView 
               isActive={state.currentMode === AppMode.EDITOR && state.originalImage === null && !showOnboardingPaywall} 
               onCapture={handleCapture} 
+              isSubscriber={state.isSubscriber}
+              onOpen360Viewer={() => {
+                if (state.isSubscriber) {
+                  updateState({ show360Viewer: true });
+                } else {
+                  setShowOnboardingPaywall(true);
+                }
+              }}
+              onOpenAI180Capture={() => {
+                if (state.isSubscriber) {
+                  setShowAI180Capture(true);
+                } else {
+                  setShowOnboardingPaywall(true);
+                }
+              }}
             />
           ) : (
             <EditorErrorBoundary
@@ -1345,7 +1360,7 @@ const App: React.FC = () => {
       )}
 
       {/* --- Bottom Navigation --- */}
-      {state.editorMode !== "interactive_180" && !state.show360Viewer && (
+      {!showAI180Capture && !state.showAI180Viewer && state.editorMode !== "interactive_180" && !state.show360Viewer && (
         <BottomNav 
           currentMode={state.currentMode} 
           onSwitchMode={(mode) => updateState({ currentMode: mode })} 
@@ -1599,57 +1614,7 @@ const App: React.FC = () => {
         </div>
       )}
 
-      {/* --- Floating 180° Button (Bottom Left) --- */}
-      {state.currentMode === AppMode.EDITOR && state.originalImage === null && !state.show360Viewer && !state.showAI180Viewer && currentUser && (
-        <div className="absolute bottom-28 left-4 z-30 pointer-events-auto flex flex-col gap-2">
-          {/* Original 180° View Button */}
-          <button
-            type="button"
-            onClick={() => {
-              if (state.isSubscriber) {
-                updateState({ show360Viewer: true });
-              } else {
-                setShowOnboardingPaywall(true);
-              }
-            }}
-            className="flex items-center gap-1.5 px-4 py-2.5 rounded-full bg-black/60 backdrop-blur-xl border border-white/10 text-white shadow-xl hover:bg-white/10 active:scale-95 transition-all w-fit"
-            title="Toggle Premium 180° Preview"
-          >
-            <svg className="w-4 h-4 text-indigo-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
-            </svg>
-            <span className="text-[10px] font-black uppercase tracking-widest flex items-center gap-1">
-              {!state.isSubscriber && <span className="text-amber-400 text-xs">🔒</span>}
-              180° View
-            </span>
-          </button>
 
-          {/* New Try AI 180° Experimental Button */}
-          {ENABLE_AI_180_EXPERIMENT && (
-            <button
-              type="button"
-              onClick={() => {
-                if (state.isSubscriber) {
-                  setShowAI180Capture(true);
-                } else {
-                  setShowOnboardingPaywall(true);
-                }
-              }}
-              className="flex items-center gap-1.5 px-4 py-2.5 rounded-full bg-indigo-600/80 backdrop-blur-xl border border-indigo-500/30 text-white shadow-xl hover:bg-indigo-500/90 active:scale-95 transition-all w-fit"
-              title="Try Experimental AI 180° Preview"
-            >
-              <svg className="w-4 h-4 text-amber-300" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M13 10V3L4 14h7v7l9-11h-7z" />
-              </svg>
-              <span className="text-[10px] font-black uppercase tracking-widest flex items-center gap-1.5">
-                {!state.isSubscriber && <span className="text-amber-400 text-xs">🔒</span>}
-                Try AI 180°
-                <span className="text-[8px] bg-amber-400 text-neutral-950 font-extrabold px-1.5 py-0.5 rounded leading-none">EXP</span>
-              </span>
-            </button>
-          )}
-        </div>
-      )}
 
       {/* --- Onboarding Paywall Overlay --- */}
       {showOnboardingPaywall && currentUser && (

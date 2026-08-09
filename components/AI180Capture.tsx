@@ -155,7 +155,7 @@ export const AI180Capture: React.FC<AI180CaptureProps> = ({ onCaptureComplete, o
   return (
     <div className="fixed inset-0 bg-black text-white flex flex-col z-50 overflow-hidden font-sans">
       {/* Top Header */}
-      <div className="relative flex items-center justify-between px-4 pt-[calc(env(safe-area-inset-top,0px)+12px)] pb-3 z-30 bg-gradient-to-b from-black/80 to-transparent">
+      <div className="relative flex items-center justify-between px-4 pt-[calc(env(safe-area-inset-top,20px)+12px)] pb-3 z-30 bg-gradient-to-b from-black/80 to-transparent">
         <button
           onClick={onClose}
           className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-black/40 backdrop-blur-md border border-white/10 text-xs font-bold text-neutral-300 active:scale-95 transition-all"
@@ -232,7 +232,7 @@ export const AI180Capture: React.FC<AI180CaptureProps> = ({ onCaptureComplete, o
       </div>
 
       {/* Action footer */}
-      <div className="px-6 py-8 bg-slate-950 flex flex-col items-center justify-center z-20 border-t border-white/5 flex-shrink-0">
+      <div className="px-6 pb-[calc(1.5rem+env(safe-area-inset-bottom,0px))] pt-6 bg-slate-950 flex flex-col items-center justify-center z-20 border-t border-white/5 flex-shrink-0">
         {captureState === 'idle' && (
           <button
             type="button"

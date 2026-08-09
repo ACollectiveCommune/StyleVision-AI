@@ -5,9 +5,19 @@ interface CameraViewProps {
   onCapture: (imageDataUrl: string) => void;
   onCapture3DBust?: (frames: string[]) => void;
   isActive: boolean;
+  isSubscriber: boolean;
+  onOpen360Viewer: () => void;
+  onOpenAI180Capture: () => void;
 }
 
-export const CameraView: React.FC<CameraViewProps> = ({ onCapture, onCapture3DBust, isActive }) => {
+export const CameraView: React.FC<CameraViewProps> = ({ 
+  onCapture, 
+  onCapture3DBust, 
+  isActive,
+  isSubscriber,
+  onOpen360Viewer,
+  onOpenAI180Capture
+}) => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const localFileInputRef = useRef<HTMLInputElement>(null);
@@ -279,8 +289,8 @@ export const CameraView: React.FC<CameraViewProps> = ({ onCapture, onCapture3DBu
           )}
 
           {/* Guided Scanner Instructions Bar */}
-          <div className="absolute top-28 left-0 right-0 text-center z-20 pointer-events-none">
-            <p className={`text-white text-xs font-black uppercase tracking-widest drop-shadow-md inline-block px-6 py-2.5 rounded-2xl backdrop-blur-xl border border-white/10 transition-all ${
+          <div className="absolute top-[calc(env(safe-area-inset-top,20px)+60px)] left-4 right-4 text-center z-20 pointer-events-none flex justify-center">
+            <p className={`text-white text-xs font-black uppercase tracking-widest drop-shadow-md inline-block px-5 py-2 rounded-2xl backdrop-blur-xl border border-white/10 transition-all max-w-[240px] sm:max-w-xs truncate ${
               scanState === 'capturing' ? 'bg-indigo-900/60 border-indigo-500 shadow-[0_0_15px_rgba(79,70,229,0.3)]' : 'bg-black/45'
             }`}>
               {scanState === 'idle' && "Align face & tap capture"}
@@ -305,54 +315,81 @@ export const CameraView: React.FC<CameraViewProps> = ({ onCapture, onCapture3DBu
             </div>
           )}
 
-          {/* Action buttons footer */}
-          {scanState === 'idle' ? (
-            <div className="absolute bottom-[calc(5.75rem+env(safe-area-inset-bottom,0px))] left-0 right-0 z-20 flex items-center justify-center gap-6 pointer-events-none">
-              {/* Local File Upload Button */}
-              <button
-                type="button"
-                onClick={() => localFileInputRef.current?.click()}
-                className="w-11 h-11 rounded-full bg-black/45 backdrop-blur-xl border border-white/10 flex items-center justify-center text-white active:scale-90 transition-all pointer-events-auto shadow-md"
-                title="Upload Photo"
-              >
-                <Icons.Album />
-              </button>
+          {/* Unified Bottom Layout Container */}
+          <div className="absolute bottom-0 left-0 right-0 z-20 px-6 pb-[calc(1.5rem+env(safe-area-inset-bottom,0px))] flex flex-col items-center pointer-events-none">
+            {scanState === 'idle' ? (
+              <>
+                {/* 180° Action Buttons Stack */}
+                <div className="flex flex-col gap-2 w-full max-w-[280px] pointer-events-auto mb-6">
+                  {/* Original 180° View Button */}
+                  <button
+                    type="button"
+                    onClick={onOpen360Viewer}
+                    className="w-full h-12 rounded-[24px] bg-black/60 backdrop-blur-xl border border-white/10 text-white flex items-center justify-center gap-2 shadow-xl hover:bg-white/10 active:scale-95 transition-all text-xs font-black uppercase tracking-widest"
+                  >
+                    <svg className="w-4.5 h-4.5 text-indigo-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
+                    </svg>
+                    <span className="flex items-center gap-1">
+                      {!isSubscriber && <span className="text-amber-400 text-xs">🔒</span>}
+                      180° View
+                    </span>
+                  </button>
 
-              {/* Main Shutter Button */}
-              <button
-                id="camera-capture-button"
-                onClick={handleCapture}
-                className="w-18 h-18 rounded-full border-[4px] border-white/40 bg-white/20 hover:bg-white/30 backdrop-blur-md transition-all flex items-center justify-center active:scale-95 shadow-[0_0_20px_rgba(0,0,0,0.4)] pointer-events-auto"
-                aria-label="Take Photo"
-              >
-                <div className="w-14 h-14 bg-white rounded-full shadow-inner"></div>
-              </button>
+                  {/* Try AI 180° EXP Button */}
+                  <button
+                    type="button"
+                    onClick={onOpenAI180Capture}
+                    className="w-full h-12 rounded-[24px] bg-indigo-600/80 backdrop-blur-xl border border-indigo-500/30 text-white flex items-center justify-center gap-2 shadow-xl hover:bg-indigo-500/90 active:scale-95 transition-all text-xs font-black uppercase tracking-widest"
+                  >
+                    <svg className="w-4.5 h-4.5 text-amber-300" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                    </svg>
+                    <span className="flex items-center gap-1.5">
+                      {!isSubscriber && <span className="text-amber-400 text-xs">🔒</span>}
+                      Try AI 180°
+                      <span className="text-[8px] bg-amber-400 text-neutral-950 font-extrabold px-1.5 py-0.5 rounded leading-none">EXP</span>
+                    </span>
+                  </button>
+                </div>
 
-              {/* Guided 3D Scan Button */}
-              {onCapture3DBust && (
-                <button
-                  type="button"
-                  onClick={handleStart3DScan}
-                  className="w-11 h-11 rounded-full bg-indigo-600 hover:bg-indigo-500 backdrop-blur-xl border border-indigo-400/30 flex items-center justify-center text-white active:scale-90 transition-all pointer-events-auto shadow-lg shadow-indigo-600/30"
-                  title="Guided 3D bust scan"
-                >
-                  <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
-                  </svg>
-                </button>
-              )}
-            </div>
-          ) : (
-            // Scanning progress indicator
-            <div className="absolute bottom-[calc(5.75rem+env(safe-area-inset-bottom,0px))] left-0 right-0 z-20 flex flex-col items-center justify-center px-12 pointer-events-none">
-              <div className="w-full max-w-xs h-1.5 bg-neutral-900 border border-white/5 rounded-full overflow-hidden">
-                <div 
-                  className="h-full bg-indigo-500 transition-all duration-100 ease-out"
-                  style={{ width: `${scanProgress}%` }}
-                />
+                {/* Camera Controls Row */}
+                <div className="flex items-center justify-center w-full max-w-[320px] pointer-events-auto mb-16 relative">
+                  {/* Left: Gallery upload button */}
+                  <div className="absolute left-0">
+                    <button
+                      type="button"
+                      onClick={() => localFileInputRef.current?.click()}
+                      className="w-12 h-12 rounded-full bg-black/45 backdrop-blur-xl border border-white/10 flex items-center justify-center text-white active:scale-90 transition-all shadow-md"
+                      title="Upload Photo"
+                    >
+                      <Icons.Album />
+                    </button>
+                  </div>
+
+                  {/* Center: Main Shutter Button */}
+                  <button
+                    id="camera-capture-button"
+                    onClick={handleCapture}
+                    className="w-18 h-18 rounded-full border-[4px] border-white/40 bg-white/20 hover:bg-white/30 backdrop-blur-md transition-all flex items-center justify-center active:scale-95 shadow-[0_0_20px_rgba(0,0,0,0.4)]"
+                    aria-label="Take Photo"
+                  >
+                    <div className="w-14 h-14 bg-white rounded-full shadow-inner"></div>
+                  </button>
+                </div>
+              </>
+            ) : (
+              /* Scanning progress indicator */
+              <div className="w-full max-w-xs flex flex-col items-center justify-center mb-20 pointer-events-none">
+                <div className="w-full h-1.5 bg-neutral-900 border border-white/5 rounded-full overflow-hidden">
+                  <div 
+                    className="h-full bg-indigo-500 transition-all duration-100 ease-out"
+                    style={{ width: `${scanProgress}%` }}
+                  />
+                </div>
               </div>
-            </div>
-          )}
+            )}
+          </div>
         </div>
       )}
 
