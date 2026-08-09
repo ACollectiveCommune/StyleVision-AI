@@ -255,4 +255,9 @@ def handler(event):
     }
 
 if __name__ == "__main__":
+    import asyncio
+    # Initialize event loop explicitly to fix RunPod SDK bug on Python 3.9+
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    
     runpod.serverless.start({"handler": handler})
