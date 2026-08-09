@@ -23,6 +23,7 @@ import {
   saveAI180Style, 
   getAI180StylesForScan 
 } from '../services/AI180FirestoreService';
+import { uploadImageToStorage } from '../services/firebase';
 
 interface AI180ViewerProps {
   uid: string;
@@ -109,12 +110,21 @@ export const AI180Viewer: React.FC<AI180ViewerProps> = ({
       // 1. Process and select 9 anchor views
       const anchors = await extractAnchorFrames(rawFrames);
       setGenProgress(10);
-      setGenMessage('Saving scan frames to persistent storage...');
+      setGenMessage('Uploading scan frames to storage...');
 
-      // 2. Save scan to Firestore
+      // Upload frames to Firebase Storage and get public HTTPS URLs
+      const uploadPromises = anchors.map((base64) => 
+        uploadImageToStorage(uid, base64, 'original')
+      );
+      const urls = await Promise.all(uploadPromises);
+
+      setGenProgress(15);
+      setGenMessage('Saving scan metadata...');
+
+      // 2. Save scan to Firestore (using storage URLs instead of heavy base64 strings)
       const scanId = await saveAI180Scan(uid, {
         userId: uid,
-        sourceFrames: anchors,
+        sourceFrames: urls,
         createdAt: new Date().toISOString(),
         version: '1.0'
       });
@@ -122,7 +132,7 @@ export const AI180Viewer: React.FC<AI180ViewerProps> = ({
       const newScan: AI180Scan = {
         id: scanId,
         userId: uid,
-        sourceFrames: anchors,
+        sourceFrames: urls,
         createdAt: new Date().toISOString(),
         version: '1.0'
       };
@@ -174,8 +184,14 @@ export const AI180Viewer: React.FC<AI180ViewerProps> = ({
       );
 
       // Preload images into memory
+      setGenMessage('Uploading styled frames to storage...');
+      const uploadPromises = results.map((base64) => 
+        uploadImageToStorage(uid, base64, 'generated')
+      );
+      const urls = await Promise.all(uploadPromises);
+
       setGenMessage('Preloading frames for smooth rotation...');
-      await preloadImages(results);
+      await preloadImages(urls);
 
       // Save generated style preview metadata
       await saveAI180Style(uid, {
@@ -185,11 +201,11 @@ export const AI180Viewer: React.FC<AI180ViewerProps> = ({
         hairColorId: selectedColor,
         beardId: selectedBeard,
         beardColorId: selectedBeardColor,
-        generatedFrames: results,
+        generatedFrames: urls,
         createdAt: new Date().toISOString()
       });
 
-      setStyledFrames(results);
+      setStyledFrames(urls);
       setActiveFrameIdx(4); // Reset to front view
       setViewState('viewer');
     } catch (err: any) {
