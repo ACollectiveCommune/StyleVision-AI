@@ -624,39 +624,62 @@ export const AI180Viewer: React.FC<AI180ViewerProps> = ({
 
         {/* View State: VIEWER (horizontal drag rotation) */}
         {viewState === 'viewer' && (
-          <div className="flex-1 flex flex-col justify-between min-h-0 relative">
-            
-            {/* Viewport Frame Box Container */}
-            <div 
-              ref={containerRef}
-              className="flex-1 touch-none relative overflow-hidden min-h-0 flex items-center justify-center bg-neutral-950"
-              onMouseDown={handleMouseDown}
-              onMouseMove={handleMouseMove}
-              onTouchStart={handleTouchStart}
-              onTouchMove={handleTouchMove}
-            >
-              {/* Full-Screen Cover Render Image */}
-              <img
-                src={generateIntermediateViews()}
-                alt="AI 180 Styled Face View"
-                className="absolute inset-0 w-full h-full object-cover z-10 pointer-events-none select-none"
-              />
+          <div 
+            ref={containerRef}
+            className="absolute inset-0 touch-none flex flex-col justify-between bg-neutral-950 z-40"
+            onMouseDown={handleMouseDown}
+            onMouseMove={handleMouseMove}
+            onTouchStart={handleTouchStart}
+            onTouchMove={handleTouchMove}
+          >
+            {/* Full-Screen Immersive Render Image */}
+            <img
+              src={generateIntermediateViews()}
+              alt="AI 180 Styled Face View"
+              className="absolute inset-0 w-full h-full object-cover z-10 pointer-events-none select-none"
+            />
 
-              {/* Floating Action Buttons (Top Right over image) */}
-              <div className="absolute top-4 right-4 flex flex-col gap-3 z-20 pointer-events-auto">
-                {/* Favorite Button */}
+            {/* Floating Top Bar overlay */}
+            <div className="absolute top-0 left-0 right-0 z-20 p-4 pt-[calc(env(safe-area-inset-top,20px)+12px)] flex justify-between items-center pointer-events-none">
+              
+              {/* Left: Back button */}
+              <div className="pointer-events-auto">
+                <button 
+                  onClick={onClose}
+                  className="flex items-center gap-1.5 px-4 h-10 rounded-full bg-black/60 backdrop-blur-md border border-white/10 text-xs font-black uppercase tracking-widest text-white shadow-lg active:scale-95 transition-all"
+                >
+                  <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+                  </svg>
+                  <span>Back</span>
+                </button>
+              </div>
+
+              {/* Center: Title Pill */}
+              <div className="flex items-center gap-2 px-4 h-10 rounded-full bg-black/60 backdrop-blur-md border border-white/10 shadow-lg pointer-events-none">
+                <span className="text-[10px] font-black uppercase tracking-widest text-white whitespace-nowrap">
+                  Try AI 180°
+                </span>
+                <span className="text-[8px] bg-amber-400 text-neutral-950 font-extrabold px-1.5 py-0.5 rounded leading-none">
+                  EXP
+                </span>
+              </div>
+
+              {/* Right: Heart & Download Grouping */}
+              <div className="flex items-center gap-2 pointer-events-auto">
+                {/* Favorite (Heart) Button */}
                 <button
                   type="button"
                   onClick={handleToggleFavorite}
-                  className={`w-11 h-11 rounded-full flex items-center justify-center border backdrop-blur-md transition-all active:scale-90 ${
+                  className={`w-10 h-10 rounded-full flex items-center justify-center border backdrop-blur-md transition-all active:scale-90 shadow-lg ${
                     isFavorited
-                      ? 'bg-rose-500/90 border-rose-600/50 text-white shadow-[0_0_12px_rgba(244,63,94,0.5)]'
+                      ? 'bg-rose-500/90 border-rose-600/50 text-white shadow-[0_0_12px_rgba(244,63,94,0.4)]'
                       : 'bg-black/60 border-white/10 text-white hover:bg-black/80'
                   }`}
                   title="Favorite Look"
                 >
-                  <svg className="w-5.5 h-5.5" fill={isFavorited ? "currentColor" : "none"} viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+                  <svg width={18} height={18} fill={isFavorited ? "currentColor" : "none"} viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
                   </svg>
                 </button>
 
@@ -664,37 +687,35 @@ export const AI180Viewer: React.FC<AI180ViewerProps> = ({
                 <button
                   type="button"
                   onClick={handleDownloadFrame}
-                  className="w-11 h-11 rounded-full bg-black/60 backdrop-blur-md border border-white/10 flex items-center justify-center text-white hover:bg-black/80 active:scale-90 transition-all"
+                  className="w-10 h-10 rounded-full bg-black/60 backdrop-blur-md border border-white/10 flex items-center justify-center text-white hover:bg-black/80 active:scale-90 transition-all shadow-lg"
                   title="Save View to Camera Roll"
                 >
-                  <svg className="w-5.5 h-5.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                  <svg width={18} height={18} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
                   </svg>
                 </button>
               </div>
 
-              {/* User rotation instruction indicator overlay */}
-              <div className="absolute inset-x-0 bottom-6 text-center text-white text-[10px] font-black uppercase tracking-widest pointer-events-none z-20 drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]">
-                ◀ Drag left or right to rotate 180° ◀
-              </div>
             </div>
 
-            {/* Back to editing customization trigger */}
-            <div className="px-6 py-4 bg-slate-950 border-t border-white/5 flex flex-col gap-2 z-20 flex-shrink-0">
-              <button
-                onClick={() => {
-                  if (appState.editorMode === "ai_180") {
-                    onClose();
-                  } else {
-                    setViewState('customization');
-                    setIsFavorited(false);
-                    setCurrentSavedDocId(null);
-                  }
-                }}
-                className="w-full py-3.5 rounded-full bg-white/5 border border-white/10 hover:bg-white/10 text-xs font-black uppercase tracking-widest transition"
-              >
-                {appState.editorMode === "ai_180" ? "Back to Editor" : "Change Style Options"}
-              </button>
+            {/* Floating Bottom Info & CTA */}
+            <div className="absolute bottom-0 left-0 right-0 z-20 p-6 pb-[calc(1.5rem+env(safe-area-inset-bottom,0px))] flex flex-col items-center gap-4 pointer-events-none">
+              
+              {/* Drag instruction overlay */}
+              <div className="px-4 py-1.5 rounded-full bg-black/45 backdrop-blur-sm border border-white/5 shadow-md text-white text-[9px] font-black uppercase tracking-widest drop-shadow-sm whitespace-nowrap pointer-events-none">
+                ◀ Drag left or right to rotate 180° ◀
+              </div>
+
+              {/* Back to Editor CTA */}
+              <div className="w-full max-w-xs pointer-events-auto">
+                <button
+                  onClick={onClose}
+                  className="w-full py-3.5 rounded-full bg-black/60 backdrop-blur-xl border border-white/15 hover:bg-black/80 text-xs font-black uppercase tracking-widest text-white shadow-xl transition-all active:scale-[0.98]"
+                >
+                  Back to Editor
+                </button>
+              </div>
+
             </div>
           </div>
         )}
