@@ -246,17 +246,22 @@ export const uploadImageToStorage = async (
   type: 'original' | 'generated'
 ): Promise<string> => {
   if (isFirebaseEnabled && uid !== "guest_user_local") {
-    const matches = base64DataUrl.match(/^data:(.+);base64,(.+)$/);
-    if (!matches || matches.length !== 3) {
-      throw new Error("Invalid image format for upload");
+    try {
+      const matches = base64DataUrl.match(/^data:(.+);base64,(.+)$/);
+      if (!matches || matches.length !== 3) {
+        throw new Error("Invalid image format for upload");
+      }
+      const mimeType = matches[1];
+      const base64Data = matches[2];
+      const extension = mimeType.split('/')[1] || 'jpg';
+      const filename = `users/${uid}/images/${Date.now()}_${type}.${extension}`;
+      const storageRef = ref(storage, filename);
+      await uploadString(storageRef, base64Data, 'base64', { contentType: mimeType });
+      return await getDownloadURL(storageRef);
+    } catch (err) {
+      console.warn("[FIREBASE STORAGE] Upload failed, falling back to base64 URL:", err);
+      return base64DataUrl;
     }
-    const mimeType = matches[1];
-    const base64Data = matches[2];
-    const extension = mimeType.split('/')[1] || 'jpg';
-    const filename = `users/${uid}/images/${Date.now()}_${type}.${extension}`;
-    const storageRef = ref(storage, filename);
-    await uploadString(storageRef, base64Data, 'base64', { contentType: mimeType });
-    return await getDownloadURL(storageRef);
   } else {
     // Return the base64 URL directly in local mode (stored in LocalStorage)
     return base64DataUrl;

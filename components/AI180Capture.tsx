@@ -153,28 +153,9 @@ export const AI180Capture: React.FC<AI180CaptureProps> = ({ onCaptureComplete, o
   };
 
   return (
-    <div className="fixed inset-0 bg-black text-white flex flex-col z-50 overflow-hidden font-sans">
-      {/* Top Header */}
-      <div className="relative flex items-center justify-between px-4 pt-[calc(env(safe-area-inset-top,20px)+12px)] pb-3 z-30 bg-gradient-to-b from-black/80 to-transparent">
-        <button
-          onClick={onClose}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-black/40 backdrop-blur-md border border-white/10 text-xs font-bold text-neutral-300 active:scale-95 transition-all"
-        >
-          Close
-        </button>
-        <span className="text-[10px] font-black uppercase tracking-widest text-indigo-400 bg-indigo-500/10 px-3 py-1 rounded-full border border-indigo-500/20">
-          AI 180° SCANNER (EXPERIMENTAL)
-        </span>
-        <button
-          onClick={handleToggleFacing}
-          className="w-8 h-8 rounded-full bg-black/40 backdrop-blur-md border border-white/10 flex items-center justify-center text-white active:scale-95 transition-all"
-        >
-          <Icons.Refresh />
-        </button>
-      </div>
-
-      {/* Main Viewfinder Box */}
-      <div className="flex-1 relative flex items-center justify-center bg-neutral-950 min-h-0">
+    <div className="fixed inset-0 bg-black text-white z-50 overflow-hidden font-sans">
+      {/* 1. Full-Screen Video Viewfinder */}
+      <div className="absolute inset-0 bg-neutral-950 z-0 flex items-center justify-center">
         {permissionGranted === false && (
           <div className="text-center p-6 max-w-xs z-20">
             <p className="text-sm text-neutral-400 font-medium mb-3">Camera access denied.</p>
@@ -209,7 +190,7 @@ export const AI180Capture: React.FC<AI180CaptureProps> = ({ onCaptureComplete, o
         </div>
 
         {/* Dynamic Instruction Banner */}
-        <div className="absolute top-16 left-4 right-4 z-20 flex justify-center pointer-events-none">
+        <div className="absolute top-[calc(env(safe-area-inset-top,20px)+60px)] left-4 right-4 z-20 flex justify-center pointer-events-none">
           <div className="px-6 py-2.5 rounded-full bg-black/60 backdrop-blur-md border border-white/15 shadow-2xl text-center text-xs font-black uppercase tracking-wider text-white animate-in fade-in slide-in-from-top-4 duration-300">
             {instructions}
           </div>
@@ -217,7 +198,7 @@ export const AI180Capture: React.FC<AI180CaptureProps> = ({ onCaptureComplete, o
 
         {/* Capturing Progress Indicator */}
         {captureState === 'capturing' && (
-          <div className="absolute bottom-8 left-6 right-6 z-20 flex flex-col items-center gap-1.5 pointer-events-none">
+          <div className="absolute bottom-32 left-6 right-6 z-20 flex flex-col items-center gap-1.5 pointer-events-none">
             <div className="w-full max-w-xs h-1.5 bg-neutral-900 border border-white/5 rounded-full overflow-hidden shadow-inner">
               <div
                 className="h-full bg-indigo-500 transition-all duration-100 ease-out shadow-[0_0_8px_#6366f1]"
@@ -231,34 +212,66 @@ export const AI180Capture: React.FC<AI180CaptureProps> = ({ onCaptureComplete, o
         )}
       </div>
 
-      {/* Action footer */}
-      <div className="px-6 pb-[calc(1.5rem+env(safe-area-inset-bottom,0px))] pt-6 bg-slate-950 flex flex-col items-center justify-center z-20 border-t border-white/5 flex-shrink-0">
-        {captureState === 'idle' && (
+      {/* 2. Floating Top Header Overlay */}
+      <div className="absolute top-0 left-0 right-0 z-30 px-4 pt-[calc(env(safe-area-inset-top,20px)+12px)] pb-6 bg-gradient-to-b from-black/85 to-transparent flex items-center justify-between pointer-events-none">
+        <div className="pointer-events-auto">
           <button
-            type="button"
-            onClick={() => {
-              setCountdown(3);
-              setCaptureState('countdown');
-            }}
-            className="w-18 h-18 rounded-full border-[4px] border-white/40 bg-white/20 hover:bg-white/30 backdrop-blur-md transition-all flex items-center justify-center active:scale-95 shadow-lg"
+            onClick={onClose}
+            className="flex items-center gap-1.5 px-4 h-10 rounded-full bg-black/60 backdrop-blur-md border border-white/10 text-xs font-black uppercase tracking-widest text-white shadow-lg active:scale-95 transition-all"
           >
-            <div className="w-14 h-14 bg-indigo-500 rounded-full flex items-center justify-center shadow-md">
-              <span className="text-[10px] font-black uppercase tracking-wider text-white">START</span>
-            </div>
+            Close
           </button>
+        </div>
+        <div className="px-4 h-10 rounded-full bg-black/60 backdrop-blur-md border border-white/10 shadow-lg flex items-center justify-center">
+          <span className="text-[9px] font-black uppercase tracking-widest text-indigo-400 whitespace-nowrap">
+            AI 180° Scanner
+          </span>
+          <span className="ml-2 text-[8px] bg-indigo-500/20 text-indigo-300 font-extrabold px-1.5 py-0.5 rounded border border-indigo-500/30 leading-none">
+            EXP
+          </span>
+        </div>
+        <div className="pointer-events-auto">
+          <button
+            onClick={handleToggleFacing}
+            className="w-10 h-10 rounded-full bg-black/60 backdrop-blur-md border border-white/10 flex items-center justify-center text-white active:scale-95 transition-all shadow-lg"
+          >
+            <Icons.Refresh />
+          </button>
+        </div>
+      </div>
+
+      {/* 3. Floating Bottom Action Footer Overlay */}
+      <div className="absolute bottom-0 left-0 right-0 z-30 px-6 pb-[calc(1.5rem+env(safe-area-inset-bottom,0px))] pt-6 bg-gradient-to-t from-black/85 to-transparent flex flex-col items-center justify-center pointer-events-none">
+        {captureState === 'idle' && (
+          <div className="w-full max-w-xs pointer-events-auto flex justify-center">
+            <button
+              type="button"
+              onClick={() => {
+                setCountdown(3);
+                setCaptureState('countdown');
+              }}
+              className="w-18 h-18 rounded-full border-[4px] border-white/40 bg-white/20 hover:bg-white/30 backdrop-blur-md transition-all flex items-center justify-center active:scale-95 shadow-lg"
+            >
+              <div className="w-14 h-14 bg-indigo-500 rounded-full flex items-center justify-center shadow-md">
+                <span className="text-[10px] font-black uppercase tracking-wider text-white">START</span>
+              </div>
+            </button>
+          </div>
         )}
         {captureState === 'capturing' && (
-          <button
-            type="button"
-            onClick={() => {
-              if (captureIntervalRef.current) clearInterval(captureIntervalRef.current);
-              setCaptureState('idle');
-              setInstructions('Align your face in the circle');
-            }}
-            className="px-6 py-2.5 rounded-full bg-red-600 hover:bg-red-500 border border-red-400/20 text-[10px] font-black uppercase tracking-widest active:scale-95 transition-all shadow-lg"
-          >
-            Cancel Scan
-          </button>
+          <div className="w-full max-w-xs pointer-events-auto flex justify-center">
+            <button
+              type="button"
+              onClick={() => {
+                if (captureIntervalRef.current) clearInterval(captureIntervalRef.current);
+                setCaptureState('idle');
+                setInstructions('Align your face in the circle');
+              }}
+              className="px-6 py-2.5 rounded-full bg-red-600 hover:bg-red-500 border border-red-400/20 text-[10px] font-black uppercase tracking-widest active:scale-95 transition-all shadow-lg"
+            >
+              Cancel Scan
+            </button>
+          </div>
         )}
       </div>
     </div>
