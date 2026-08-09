@@ -327,10 +327,10 @@ export const CameraView: React.FC<CameraViewProps> = ({
                     onClick={onOpen360Viewer}
                     className="w-full h-12 rounded-[24px] bg-black/60 backdrop-blur-xl border border-white/10 text-white flex items-center justify-center gap-2 shadow-xl hover:bg-white/10 active:scale-95 transition-all text-xs font-black uppercase tracking-widest"
                   >
-                    <svg className="w-4.5 h-4.5 text-indigo-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
+                    <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="text-indigo-400">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
                     </svg>
-                    <span className="flex items-center gap-1">
+                    <span className="flex items-center gap-1 whitespace-nowrap">
                       {!isSubscriber && <span className="text-amber-400 text-xs">🔒</span>}
                       180° View
                     </span>
@@ -342,10 +342,10 @@ export const CameraView: React.FC<CameraViewProps> = ({
                     onClick={onOpenAI180Capture}
                     className="w-full h-12 rounded-[24px] bg-indigo-600/80 backdrop-blur-xl border border-indigo-500/30 text-white flex items-center justify-center gap-2 shadow-xl hover:bg-indigo-500/90 active:scale-95 transition-all text-xs font-black uppercase tracking-widest"
                   >
-                    <svg className="w-4.5 h-4.5 text-amber-300" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                    <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} className="text-amber-300">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
                     </svg>
-                    <span className="flex items-center gap-1.5">
+                    <span className="flex items-center gap-1.5 whitespace-nowrap">
                       {!isSubscriber && <span className="text-amber-400 text-xs">🔒</span>}
                       Try AI 180°
                       <span className="text-[8px] bg-amber-400 text-neutral-950 font-extrabold px-1.5 py-0.5 rounded leading-none">EXP</span>
