@@ -88,17 +88,24 @@ export const AI180Capture: React.FC<AI180CaptureProps> = ({ onCaptureComplete, o
 
       const ctx = canvas.getContext('2d');
       if (ctx) {
-        ctx.save();
-        // Mirror front camera only
-        if (facingMode === 'user') {
-          ctx.translate(canvas.width, 0);
-          ctx.scale(-1, 1);
+        // Downscale camera feed resolution to 512px max dimension to respect Gemini token quotas
+        const maxDim = 512;
+        let targetWidth = video.videoWidth;
+        let targetHeight = video.videoHeight;
+
+        if (targetWidth > maxDim || targetHeight > maxDim) {
+          if (targetWidth > targetHeight) {
+            targetHeight = Math.round((targetHeight * maxDim) / targetWidth);
+            targetWidth = maxDim;
+          } else {
+            targetWidth = Math.round((targetWidth * maxDim) / targetHeight);
+            targetHeight = maxDim;
+          }
         }
 
-        // Dynamically match canvas size to camera feed resolution
-        if (canvas.width !== video.videoWidth || canvas.height !== video.videoHeight) {
-          canvas.width = video.videoWidth;
-          canvas.height = video.videoHeight;
+        if (canvas.width !== targetWidth || canvas.height !== targetHeight) {
+          canvas.width = targetWidth;
+          canvas.height = targetHeight;
         }
 
         ctx.save();

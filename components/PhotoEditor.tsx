@@ -241,6 +241,8 @@ export const PhotoEditor: React.FC<PhotoEditorProps> = ({
   onToggleLookFavorite
 }) => {
   const is180Mode = appState.editorMode === "interactive_180";
+  const isAI180Mode = appState.editorMode === "ai_180";
+  const isAny180Mode = is180Mode || isAI180Mode;
 
   // Top-level mount safety checks for interactive_180 mode
   if (is180Mode) {
@@ -450,6 +452,11 @@ export const PhotoEditor: React.FC<PhotoEditorProps> = ({
   // Manual Generation Handler
   // Manual Generation Handler
   const handleGenerate = useCallback(async () => {
+    if (appState.editorMode === "ai_180") {
+      onUpdateState({ showAI180Viewer: true });
+      return;
+    }
+
     if (!appState.originalImage) {
       onUpdateState({ isProcessing: false });
       return;
@@ -2165,7 +2172,7 @@ export const PhotoEditor: React.FC<PhotoEditorProps> = ({
 
           {/* Sticky Generate Button Container */}
           <div className={`w-full flex flex-col items-center bg-gradient-to-t from-[#090909] via-[#090909] to-transparent pt-3 px-4 flex-shrink-0 z-10 ${
-            is180Mode
+            isAny180Mode
               ? "pb-[calc(2.2rem+env(safe-area-inset-bottom,0px))]"
               : "pb-[calc(5.2rem+env(safe-area-inset-bottom,0px))]"
           }`}>
@@ -2187,13 +2194,13 @@ export const PhotoEditor: React.FC<PhotoEditorProps> = ({
               ) : (
                 <>
                   <Icons.Magic className="w-4 h-4 stroke-[2.5]" />
-                  <span>✨ {is180Mode ? "Generate 180° Preview" : "Generate New Look"}</span>
+                  <span>✨ {isAI180Mode ? "Generate AI 180° Style" : is180Mode ? "Generate 180° Preview" : "Generate New Look"}</span>
                 </>
               )}
             </button>
             {!appState.isProcessing && (
               <span className="text-[8px] font-black uppercase text-neutral-500 mt-1.5 tracking-wider">
-                {is180Mode 
+                {isAny180Mode 
                   ? "Costs 1 Premium Credit" 
                   : activeTab === 'prompt'
                     ? "Costs 1 Premium Credit"

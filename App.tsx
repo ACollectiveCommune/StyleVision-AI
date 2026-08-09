@@ -10,6 +10,9 @@ import { OnboardingView } from './components/OnboardingView';
 import { ThreeSixtyViewer } from './components/ThreeSixtyViewer';
 import { ENABLE_AI_180_EXPERIMENT } from './constants/featureFlags';
 import { AI180Viewer } from './components/AI180Viewer';
+import { AI180Capture } from './components/AI180Capture';
+import { extractAnchorFrames } from './services/AI180ViewProcessor';
+import { saveAI180Scan } from './services/AI180FirestoreService';
 import { Icons, HAIR_STYLES_MALE, HAIR_STYLES_FEMALE, HAIR_COLORS, BEARD_STYLES, BEARD_COLORS, OUTFIT_STYLES, MAKEUP_STYLES } from './constants';
 import { 
   auth, 
@@ -180,6 +183,7 @@ const App: React.FC = () => {
   const [showOnboardingPaywall, setShowOnboardingPaywall] = useState(false);
   const [showAdModal, setShowAdModal] = useState(false);
   const [showQualityModal, setShowQualityModal] = useState(false);
+  const [showAI180Capture, setShowAI180Capture] = useState(false);
   const [pendingImage, setPendingImage] = useState<string | null>(null);
   const [favoritedStyles, setFavoritedStyles] = useState<FavoritedStyle[]>([]);
   const [favoritedCreations, setFavoritedCreations] = useState<SavedGeneration[]>([]);
@@ -548,6 +552,43 @@ const App: React.FC = () => {
 
   const handleCapture = (imageDataUrl: string) => {
     applyCapturedImage(imageDataUrl);
+  };
+
+  const handleCaptureAI180Complete = async (rawFrames: string[]) => {
+    setShowAI180Capture(false);
+    updateState({ isProcessing: true });
+    const uid = currentUser?.uid || "guest_user_local";
+    try {
+      // 1. Extract 9 sharpest anchor views
+      const anchors = await extractAnchorFrames(rawFrames);
+      
+      // 2. Upload frames to Firebase Storage
+      const uploadPromises = anchors.map((base64) => 
+        uploadImageToStorage(uid, base64, 'original')
+      );
+      const urls = await Promise.all(uploadPromises);
+
+      // 3. Save scan to Firestore / LocalStorage
+      const scanId = await saveAI180Scan(uid, {
+        userId: uid,
+        sourceFrames: urls,
+        createdAt: new Date().toISOString(),
+        version: '1.0'
+      });
+
+      // 4. Transition straight to Editor mode with Front View baseline
+      updateState({
+        editorMode: "ai_180",
+        currentMode: AppMode.EDITOR,
+        originalImage: urls[4], // Front view frame as baseline
+        activeAI180ScanId: scanId,
+        isProcessing: false
+      });
+    } catch (err) {
+      console.error("Failed to process AI 180 capture:", err);
+      alert("Failed to process scan. Please try again.");
+      updateState({ isProcessing: false });
+    }
   };
 
   const handleTryTemplate = (template: PreviewPreset) => {
@@ -1589,7 +1630,7 @@ const App: React.FC = () => {
               type="button"
               onClick={() => {
                 if (state.isSubscriber) {
-                  updateState({ showAI180Viewer: true });
+                  setShowAI180Capture(true);
                 } else {
                   setShowOnboardingPaywall(true);
                 }
@@ -1643,6 +1684,13 @@ const App: React.FC = () => {
           onUpdateState={updateState}
           onClose={() => updateState({ showAI180Viewer: false, activeAI180ScanId: null })}
           onOpenOriginal180={() => updateState({ show360Viewer: true })}
+        />
+      )}
+
+      {showAI180Capture && currentUser && (
+        <AI180Capture
+          onCaptureComplete={handleCaptureAI180Complete}
+          onClose={() => setShowAI180Capture(false)}
         />
       )}
 

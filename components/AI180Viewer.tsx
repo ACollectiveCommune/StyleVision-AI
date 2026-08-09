@@ -42,7 +42,9 @@ export const AI180Viewer: React.FC<AI180ViewerProps> = ({
   onClose,
   onOpenOriginal180
 }) => {
-  const [viewState, setViewState] = useState<'intro' | 'capture' | 'customization' | 'generating' | 'viewer' | 'error'>('intro');
+  const [viewState, setViewState] = useState<'intro' | 'capture' | 'customization' | 'generating' | 'viewer' | 'error'>(
+    appState.activeAI180ScanId ? 'generating' : 'intro'
+  );
   const [scans, setScans] = useState<AI180Scan[]>([]);
   const [selectedScan, setSelectedScan] = useState<AI180Scan | null>(null);
   
@@ -106,6 +108,78 @@ export const AI180Viewer: React.FC<AI180ViewerProps> = ({
       setSelectedOutfit(appState.selectedOutfit.id);
     }
   }, [appState]);
+
+  // Handle immediate auto-generation if mounted from editor try-on trigger
+  useEffect(() => {
+    if (appState.activeAI180ScanId) {
+      const runImmediateGeneration = async () => {
+        try {
+          const list = await getAI180Scans(uid);
+          const scan = list.find(s => s.id === appState.activeAI180ScanId);
+          if (scan) {
+            setSelectedScan(scan);
+            setViewState('generating');
+            setGenProgress(0);
+            setGenMessage('Initializing Try-on Generator...');
+
+            const styleSnapshot = {
+              hairstyleId: appState.selectedHairStyle?.id || 'original',
+              hairColorId: appState.selectedHairColor?.id || 'natural',
+              beardId: appState.selectedBeardStyle?.id || 'beard_none',
+              beardColorId: appState.selectedBeardColor?.id || 'natural',
+              aesthetics: {},
+              makeup: 'makeup_none',
+              outfitId: appState.selectedOutfit?.id || 'original'
+            };
+
+            const results = await generateAI180Preview(
+              uid,
+              scan.id,
+              scan.sourceFrames,
+              styleSnapshot,
+              appState,
+              (percent, msg) => {
+                setGenProgress(percent);
+                setGenMessage(msg);
+              }
+            );
+
+            setGenMessage('Uploading styled frames...');
+            const uploadPromises = results.map(base64 => 
+              uploadImageToStorage(uid, base64, 'generated')
+            );
+            const urls = await Promise.all(uploadPromises);
+
+            setGenMessage('Preloading frames...');
+            await preloadImages(urls);
+
+            // Save styled metadata
+            await saveAI180Style(uid, {
+              userId: uid,
+              scanId: scan.id,
+              hairstyleId: styleSnapshot.hairstyleId,
+              hairColorId: styleSnapshot.hairColorId,
+              beardId: styleSnapshot.beardId,
+              beardColorId: styleSnapshot.beardColorId,
+              generatedFrames: urls,
+              createdAt: new Date().toISOString()
+            });
+
+            setStyledFrames(urls);
+            setActiveFrameIdx(4);
+            setViewState('viewer');
+          } else {
+            throw new Error("Active 180° scan data could not be found");
+          }
+        } catch (err: any) {
+          console.error(err);
+          setErrorMsg(err.message || 'AI generation failed');
+          setViewState('error');
+        }
+      };
+      runImmediateGeneration();
+    }
+  }, [appState.activeAI180ScanId, uid]);
 
   // Preload generated images for smooth scrubbing
   const preloadImages = (urls: string[]): Promise<void> => {
@@ -185,13 +259,13 @@ export const AI180Viewer: React.FC<AI180ViewerProps> = ({
     setGenMessage('Initializing try-on generator...');
 
     const styleSnapshot = {
-      hairstyleId: selectedHair,
-      hairColorId: selectedColor,
-      beardId: selectedBeard,
-      beardColorId: selectedBeardColor,
+      hairstyleId: appState.selectedHairStyle?.id || selectedHair,
+      hairColorId: appState.selectedHairColor?.id || selectedColor,
+      beardId: appState.selectedBeardStyle?.id || selectedBeard,
+      beardColorId: appState.selectedBeardColor?.id || selectedBeardColor,
       aesthetics: {},
       makeup: 'makeup_none',
-      outfitId: selectedOutfit
+      outfitId: appState.selectedOutfit?.id || selectedOutfit
     };
 
     try {
@@ -608,13 +682,17 @@ export const AI180Viewer: React.FC<AI180ViewerProps> = ({
             <div className="px-6 py-4 bg-slate-950 border-t border-white/5 flex flex-col gap-2 z-20 flex-shrink-0">
               <button
                 onClick={() => {
-                  setViewState('customization');
-                  setIsFavorited(false);
-                  setCurrentSavedDocId(null);
+                  if (appState.editorMode === "ai_180") {
+                    onClose();
+                  } else {
+                    setViewState('customization');
+                    setIsFavorited(false);
+                    setCurrentSavedDocId(null);
+                  }
                 }}
                 className="w-full py-3.5 rounded-full bg-white/5 border border-white/10 hover:bg-white/10 text-xs font-black uppercase tracking-widest transition"
               >
-                Change Style Options
+                {appState.editorMode === "ai_180" ? "Back to Editor" : "Change Style Options"}
               </button>
             </div>
           </div>

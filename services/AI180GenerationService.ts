@@ -76,6 +76,11 @@ export const generateAI180Preview = async (
   const angleOrder = [0, 1, 2, 3, 5, 6, 7, 8];
   
   for (let step = 0; step < angleOrder.length; step++) {
+    // Spacing requests by 1.2 seconds prevents sudden API token-rate limit bursts
+    if (step > 0) {
+      await new Promise(resolve => setTimeout(resolve, 1200));
+    }
+
     const idx = angleOrder[step];
     const progressPercent = 15 + Math.floor((step / angleOrder.length) * 80);
     onProgress(progressPercent, `Generating style consistency for angle ${step + 1} of 8...`);
