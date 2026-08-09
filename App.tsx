@@ -8,7 +8,8 @@ import { FavoritesView } from './components/FavoritesView';
 import { PaywallView } from './components/PaywallView';
 import { OnboardingView } from './components/OnboardingView';
 import { ThreeSixtyViewer } from './components/ThreeSixtyViewer';
-import { ThreeDSplatViewer } from './components/ThreeDSplatViewer';
+import { ENABLE_AI_180_EXPERIMENT } from './constants/featureFlags';
+import { AI180Viewer } from './components/AI180Viewer';
 import { Icons, HAIR_STYLES_MALE, HAIR_STYLES_FEMALE, HAIR_COLORS, BEARD_STYLES, BEARD_COLORS, OUTFIT_STYLES, MAKEUP_STYLES } from './constants';
 import { 
   auth, 
@@ -549,35 +550,6 @@ const App: React.FC = () => {
     applyCapturedImage(imageDataUrl);
   };
 
-  const handleCapture3DBust = (frames: string[]) => {
-    const total = frames.length;
-    const left = frames[0];
-    const front_left = frames[Math.floor(total * 0.25)];
-    const front = frames[Math.floor(total * 0.5)];
-    const front_right = frames[Math.floor(total * 0.75)];
-    const right = frames[total - 1];
-
-    const session = {
-      id: `session_${Date.now()}`,
-      frames: {
-        left,
-        front_left,
-        front,
-        front_right,
-        right,
-        allFrames: frames
-      },
-      status: "captured" as const
-    };
-
-    updateState({
-      current180Session: session,
-      editorMode: "interactive_180",
-      show3DSplatViewer: true,
-      originalImage: front
-    });
-  };
-
   const handleTryTemplate = (template: PreviewPreset) => {
     if (!state.originalImage) {
       alert("Please capture or upload a face portrait first using the Editor tab!");
@@ -812,7 +784,6 @@ const App: React.FC = () => {
             <CameraView 
               isActive={state.currentMode === AppMode.EDITOR && state.originalImage === null && !showOnboardingPaywall} 
               onCapture={handleCapture} 
-              onCapture3DBust={handleCapture3DBust}
             />
           ) : (
             <EditorErrorBoundary
@@ -873,7 +844,6 @@ const App: React.FC = () => {
                 favoritedStyles={favoritedStyles}
                 onToggleStyleFavorite={handleToggleStyleFavorite}
                 onOpenMenu={() => setShowSideMenu(true)}
-                onOpen3DSplat={() => updateState({ show3DSplatViewer: true })}
                 favoritedCreations={favoritedCreations}
                 onToggleLookFavorite={handleToggleLookFavorite}
               />
@@ -1299,15 +1269,6 @@ const App: React.FC = () => {
               </svg>
             </button>
 
-            {/* Floating Yellow 3D Test Button (under menu trigger when camera is live) */}
-            <button
-              type="button"
-              onClick={() => updateState({ show3DSplatViewer: true })}
-              className="w-9 h-9 rounded-full bg-yellow-500 hover:bg-yellow-400 flex items-center justify-center text-neutral-950 border border-yellow-600/20 active:scale-90 transition-transform shadow-lg"
-              title="Test 3D Splat Preview"
-            >
-              <span className="text-[10px] font-black uppercase tracking-tighter text-neutral-950">3D</span>
-            </button>
           </div>
 
           {/* Controls: Credits & Gallery (Right) */}
@@ -1598,8 +1559,9 @@ const App: React.FC = () => {
       )}
 
       {/* --- Floating 180° Button (Bottom Left) --- */}
-      {state.currentMode === AppMode.EDITOR && state.originalImage === null && !state.show360Viewer && currentUser && (
-        <div className="absolute bottom-28 left-4 z-30 pointer-events-auto">
+      {state.currentMode === AppMode.EDITOR && state.originalImage === null && !state.show360Viewer && !state.showAI180Viewer && currentUser && (
+        <div className="absolute bottom-28 left-4 z-30 pointer-events-auto flex flex-col gap-2">
+          {/* Original 180° View Button */}
           <button
             type="button"
             onClick={() => {
@@ -1609,7 +1571,7 @@ const App: React.FC = () => {
                 setShowOnboardingPaywall(true);
               }
             }}
-            className="flex items-center gap-1.5 px-4 py-2.5 rounded-full bg-black/60 backdrop-blur-xl border border-white/10 text-white shadow-xl hover:bg-white/10 active:scale-95 transition-all"
+            className="flex items-center gap-1.5 px-4 py-2.5 rounded-full bg-black/60 backdrop-blur-xl border border-white/10 text-white shadow-xl hover:bg-white/10 active:scale-95 transition-all w-fit"
             title="Toggle Premium 180° Preview"
           >
             <svg className="w-4 h-4 text-indigo-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -1620,6 +1582,31 @@ const App: React.FC = () => {
               180° View
             </span>
           </button>
+
+          {/* New Try AI 180° Experimental Button */}
+          {ENABLE_AI_180_EXPERIMENT && (
+            <button
+              type="button"
+              onClick={() => {
+                if (state.isSubscriber) {
+                  updateState({ showAI180Viewer: true });
+                } else {
+                  setShowOnboardingPaywall(true);
+                }
+              }}
+              className="flex items-center gap-1.5 px-4 py-2.5 rounded-full bg-indigo-600/80 backdrop-blur-xl border border-indigo-500/30 text-white shadow-xl hover:bg-indigo-500/90 active:scale-95 transition-all w-fit"
+              title="Try Experimental AI 180° Preview"
+            >
+              <svg className="w-4 h-4 text-amber-300" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M13 10V3L4 14h7v7l9-11h-7z" />
+              </svg>
+              <span className="text-[10px] font-black uppercase tracking-widest flex items-center gap-1.5">
+                {!state.isSubscriber && <span className="text-amber-400 text-xs">🔒</span>}
+                Try AI 180°
+                <span className="text-[8px] bg-amber-400 text-neutral-950 font-extrabold px-1.5 py-0.5 rounded leading-none">EXP</span>
+              </span>
+            </button>
+          )}
         </div>
       )}
 
@@ -1648,15 +1635,17 @@ const App: React.FC = () => {
         />
       )}
 
-      {/* --- Revolutionary 3D Splat Preview Overlay --- */}
-      {state.show3DSplatViewer && currentUser && (
-        <ThreeDSplatViewer
+      {/* --- Experimental AI 180° Viewer Overlay --- */}
+      {state.showAI180Viewer && currentUser && (
+        <AI180Viewer
           uid={currentUser.uid}
           appState={state}
           onUpdateState={updateState}
-          onClose={() => updateState({ show3DSplatViewer: false, active3DSplatPreviewId: null })}
+          onClose={() => updateState({ showAI180Viewer: false, activeAI180ScanId: null })}
+          onOpenOriginal180={() => updateState({ show360Viewer: true })}
         />
       )}
+
 
       {/* --- Rewarded Video Ad Modal --- */}
       {showAdModal && (

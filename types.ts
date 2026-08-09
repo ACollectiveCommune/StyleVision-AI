@@ -91,11 +91,11 @@ export interface AppState {
   active360PreviewId?: string | null;
   is360FeatureEnabled?: boolean;
   show360Viewer?: boolean;
-  show3DSplatViewer?: boolean;
-  active3DSplatPreviewId?: string | null;
+  showAI180Viewer?: boolean;
+  activeAI180ScanId?: string | null;
   captured180Frames?: Record<string, string>;
   currentDocId?: string | null;
-  editorMode?: "single_photo" | "interactive_180";
+  editorMode?: "single_photo" | "interactive_180" | "ai_180";
   current180Session?: Interactive180Session | null;
 }
 
@@ -110,6 +110,26 @@ export interface Interactive180Session {
     allFrames?: string[];
   };
   status: "captured" | "editing" | "generating" | "complete";
+}
+
+export interface AI180Scan {
+  id: string;
+  userId: string;
+  createdAt: string;
+  sourceFrames: string[]; // 9 base64/Storage URLs
+  version: string;
+}
+
+export interface AI180GeneratedStyle {
+  id: string;
+  userId: string;
+  scanId: string;
+  hairstyleId: string;
+  hairColorId: string;
+  beardId: string;
+  beardColorId: string;
+  generatedFrames: string[]; // 9 styled preview URLs
+  createdAt: string;
 }
 
 export interface User360Wallet {

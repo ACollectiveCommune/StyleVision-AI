@@ -225,7 +225,6 @@ interface PhotoEditorProps {
   favoritedStyles: any[];
   onToggleStyleFavorite: (style: any) => void;
   onOpenMenu: () => void;
-  onOpen3DSplat?: () => void;
   favoritedCreations: SavedGeneration[];
   onToggleLookFavorite: (generation: SavedGeneration, isFavorite: boolean) => Promise<void>;
 }
@@ -238,7 +237,6 @@ export const PhotoEditor: React.FC<PhotoEditorProps> = ({
   favoritedStyles, 
   onToggleStyleFavorite, 
   onOpenMenu,
-  onOpen3DSplat,
   favoritedCreations,
   onToggleLookFavorite
 }) => {
@@ -1161,19 +1159,6 @@ export const PhotoEditor: React.FC<PhotoEditorProps> = ({
         </button>
       </div>
 
-      {/* Floating 3D Splat Preview Trigger (Yellow Button under Menu Trigger) */}
-      {onOpen3DSplat && (
-        <div className="absolute top-[148px] left-4 z-30 pointer-events-auto">
-          <button
-            type="button"
-            onClick={onOpen3DSplat}
-            className="w-10 h-10 rounded-full bg-yellow-500 hover:bg-yellow-400 flex items-center justify-center text-neutral-950 border border-yellow-600/20 active:scale-90 transition-transform shadow-lg"
-            title="Test 3D Splat Preview"
-          >
-            <span className="text-[10px] font-black uppercase tracking-tighter text-neutral-950">3D</span>
-          </button>
-        </div>
-      )}
 
       {/* 2. Floating Action Controls (Top Right) */}
       <div className="absolute top-24 right-4 flex flex-col gap-3 z-30 pointer-events-auto">
