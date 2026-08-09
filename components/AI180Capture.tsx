@@ -132,7 +132,7 @@ export const AI180Capture: React.FC<AI180CaptureProps> = ({ onCaptureComplete, o
         ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
         ctx.restore();
 
-        const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+        const dataUrl = canvas.toDataURL('image/jpeg', 0.95);
         framesRef.current.push(dataUrl);
       }
 

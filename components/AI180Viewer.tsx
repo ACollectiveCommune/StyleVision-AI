@@ -64,6 +64,7 @@ export const AI180Viewer: React.FC<AI180ViewerProps> = ({
   const [styledFrames, setStyledFrames] = useState<string[]>([]);
   const [activeFrameIdx, setActiveFrameIdx] = useState<number>(4); // Default to Front view (index 4)
   const [isPreloading, setIsPreloading] = useState<boolean>(false);
+  const [hasSwiped, setHasSwiped] = useState<boolean>(false);
 
   // Favorite synchronization states
   const [isFavorited, setIsFavorited] = useState<boolean>(false);
@@ -398,7 +399,12 @@ export const AI180Viewer: React.FC<AI180ViewerProps> = ({
     let targetIdx = startFrameIdx.current - frameOffset;
     targetIdx = Math.max(0, Math.min(8, targetIdx));
     
-    setActiveFrameIdx(targetIdx);
+    if (targetIdx !== activeFrameIdx) {
+      setActiveFrameIdx(targetIdx);
+      if (!hasSwiped) {
+        setHasSwiped(true);
+      }
+    }
   };
 
   // HTML event bridges
@@ -426,19 +432,26 @@ export const AI180Viewer: React.FC<AI180ViewerProps> = ({
   return (
     <div className="fixed inset-0 bg-slate-950 text-white flex flex-col z-50 overflow-hidden font-sans">
       
-      {/* 1. Header */}
-      <div className="relative flex items-center justify-between px-4 pt-[calc(env(safe-area-inset-top,0px)+12px)] pb-3 bg-slate-950 border-b border-white/10 z-30">
-        <button 
-          onClick={onClose} 
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/5 border border-white/10 text-xs font-bold text-neutral-300 active:scale-95 transition-all"
-        >
-          Back
-        </button>
-        <span className="text-[10px] font-black uppercase tracking-widest text-amber-400 bg-amber-400/10 px-3 py-1 rounded-full border border-amber-400/20">
-          Try AI 180° (Experimental)
-        </span>
-        <div className="w-12 h-6" /> {/* Spacer */}
-      </div>
+      {/* 1. Header (Only rendered when not in viewer state to prevent duplicate floating headers) */}
+      {viewState !== 'viewer' && viewState !== 'capture' && (
+        <div className="relative flex items-center justify-between px-4 pt-[calc(env(safe-area-inset-top,0px)+12px)] pb-3 bg-slate-950 border-b border-white/10 z-30">
+          <button 
+            onClick={onClose} 
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/5 border border-white/10 text-xs font-bold text-neutral-300 active:scale-95 transition-all"
+          >
+            Back
+          </button>
+          <div className="flex items-center gap-1.5">
+            <span className="text-[10px] font-black uppercase tracking-widest text-white/80 bg-white/5 px-3 py-1 rounded-full border border-white/5">
+              AI 180° Preview
+            </span>
+            <span className="text-[8px] bg-amber-400 text-neutral-950 font-extrabold px-1.5 py-0.5 rounded leading-none">
+              EXP
+            </span>
+          </div>
+          <div className="w-12 h-6" /> {/* Spacer */}
+        </div>
+      )}
 
       {/* 2. Main Work Area */}
       <div className="flex-1 relative flex flex-col justify-between bg-slate-950 overflow-hidden min-h-0">
@@ -638,12 +651,21 @@ export const AI180Viewer: React.FC<AI180ViewerProps> = ({
             onTouchStart={handleTouchStart}
             onTouchMove={handleTouchMove}
           >
-            {/* Full-Screen Immersive Render Image */}
-            <img
-              src={generateIntermediateViews()}
-              alt="AI 180 Styled Face View"
-              className="absolute inset-0 w-full h-full object-cover z-10 pointer-events-none select-none"
-            />
+            {/* Full-Screen Immersive Render Image Frame Container */}
+            <div className="absolute inset-0 z-10 overflow-hidden flex items-center justify-center pointer-events-none select-none">
+              {/* Background: Blurred letterboxing fallback */}
+              <img
+                src={generateIntermediateViews()}
+                alt=""
+                className="absolute inset-0 w-full h-full object-cover blur-3xl opacity-35 scale-110 pointer-events-none select-none z-0"
+              />
+              {/* Foreground: Pristine high-resolution sharp preview */}
+              <img
+                src={generateIntermediateViews()}
+                alt="AI 180 Styled Face View"
+                className="relative max-w-full max-h-full object-contain z-10 pointer-events-none select-none"
+              />
+            </div>
 
             {/* Floating Top Bar overlay */}
             <div className="absolute top-0 left-0 right-0 z-20 p-4 pt-[calc(env(safe-area-inset-top,20px)+12px)] flex justify-between items-center pointer-events-none">
@@ -652,7 +674,7 @@ export const AI180Viewer: React.FC<AI180ViewerProps> = ({
               <div className="pointer-events-auto">
                 <button 
                   onClick={onClose}
-                  className="flex items-center gap-1.5 px-4 h-10 rounded-full bg-black/60 backdrop-blur-md border border-white/10 text-xs font-black uppercase tracking-widest text-white shadow-lg active:scale-95 transition-all"
+                  className="flex items-center gap-1.5 px-4 h-10 rounded-full bg-black/40 backdrop-blur-xl border border-white/10 text-xs font-black uppercase tracking-widest text-white shadow-lg active:scale-95 transition-all"
                 >
                   <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
@@ -662,9 +684,9 @@ export const AI180Viewer: React.FC<AI180ViewerProps> = ({
               </div>
 
               {/* Center: Title Pill */}
-              <div className="flex items-center gap-2 px-4 h-10 rounded-full bg-black/60 backdrop-blur-md border border-white/10 shadow-lg pointer-events-none">
+              <div className="flex items-center gap-1.5 px-4 h-10 rounded-full bg-black/40 backdrop-blur-xl border border-white/10 shadow-lg pointer-events-none">
                 <span className="text-[10px] font-black uppercase tracking-widest text-white whitespace-nowrap">
-                  Try AI 180°
+                  AI 180° Preview
                 </span>
                 <span className="text-[8px] bg-amber-400 text-neutral-950 font-extrabold px-1.5 py-0.5 rounded leading-none">
                   EXP
@@ -677,14 +699,14 @@ export const AI180Viewer: React.FC<AI180ViewerProps> = ({
                 <button
                   type="button"
                   onClick={handleToggleFavorite}
-                  className={`w-10 h-10 rounded-full flex items-center justify-center border backdrop-blur-md transition-all active:scale-90 shadow-lg ${
+                  className={`w-10 h-10 rounded-full flex items-center justify-center border backdrop-blur-xl transition-all active:scale-90 shadow-lg ${
                     isFavorited
                       ? 'bg-rose-500/90 border-rose-600/50 text-white shadow-[0_0_12px_rgba(244,63,94,0.4)]'
-                      : 'bg-black/60 border-white/10 text-white hover:bg-black/80'
+                      : 'bg-black/40 border-white/10 text-white hover:bg-black/60'
                   }`}
                   title="Favorite Look"
                 >
-                  <svg width={18} height={18} fill={isFavorited ? "currentColor" : "none"} viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <svg width={16} height={16} fill={isFavorited ? "currentColor" : "none"} viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
                   </svg>
                 </button>
@@ -693,10 +715,10 @@ export const AI180Viewer: React.FC<AI180ViewerProps> = ({
                 <button
                   type="button"
                   onClick={handleDownloadFrame}
-                  className="w-10 h-10 rounded-full bg-black/60 backdrop-blur-md border border-white/10 flex items-center justify-center text-white hover:bg-black/80 active:scale-90 transition-all shadow-lg"
+                  className="w-10 h-10 rounded-full bg-black/40 backdrop-blur-xl border border-white/10 flex items-center justify-center text-white hover:bg-black/60 active:scale-90 transition-all shadow-lg"
                   title="Save View to Camera Roll"
                 >
-                  <svg width={18} height={18} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <svg width={16} height={16} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
                   </svg>
                 </button>
@@ -708,15 +730,17 @@ export const AI180Viewer: React.FC<AI180ViewerProps> = ({
             <div className="absolute bottom-0 left-0 right-0 z-20 p-6 pb-[calc(1.5rem+env(safe-area-inset-bottom,0px))] flex flex-col items-center gap-4 pointer-events-none">
               
               {/* Drag instruction overlay */}
-              <div className="px-4 py-1.5 rounded-full bg-black/45 backdrop-blur-sm border border-white/5 shadow-md text-white text-[9px] font-black uppercase tracking-widest drop-shadow-sm whitespace-nowrap pointer-events-none">
-                ◀ Drag left or right to rotate 180° ◀
+              <div className={`px-4 py-2 rounded-full bg-black/45 backdrop-blur-md border border-white/5 shadow-lg text-white/70 text-[10px] font-bold tracking-wider transition-opacity duration-500 pointer-events-none ${
+                hasSwiped ? 'opacity-0' : 'opacity-100'
+              }`}>
+                ↔ Swipe to rotate
               </div>
 
               {/* Back to Editor CTA */}
-              <div className="w-full max-w-xs pointer-events-auto">
+              <div className="w-full max-w-[280px] pointer-events-auto">
                 <button
                   onClick={onClose}
-                  className="w-full py-3.5 rounded-full bg-black/60 backdrop-blur-xl border border-white/15 hover:bg-black/80 text-xs font-black uppercase tracking-widest text-white shadow-xl transition-all active:scale-[0.98]"
+                  className="w-full py-3 rounded-full bg-white/10 hover:bg-white/15 backdrop-blur-xl border border-white/10 text-[11px] font-extrabold uppercase tracking-widest text-white/80 hover:text-white shadow-lg transition-all active:scale-[0.97]"
                 >
                   Back to Editor
                 </button>
