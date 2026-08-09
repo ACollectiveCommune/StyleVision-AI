@@ -590,15 +590,7 @@ const App: React.FC = () => {
     } catch (err: any) {
       console.error("Failed to process AI 180 capture:", err);
       const errMsg = err?.message || String(err);
-      const isQuotaError = errMsg.toLowerCase().includes("quota") || errMsg.toLowerCase().includes("exhausted");
-      
-      if (isQuotaError) {
-        localStorage.setItem('stylevision_force_local', 'true');
-        alert("Firebase Quota Exceeded: Your daily free limit has been reached. The app has automatically switched to LOCAL OFFLINE mode so you can continue testing all features locally. You can switch back to Cloud Mode anytime from the side menu once your billing account propagates on Google's servers.");
-        window.location.reload();
-      } else {
-        alert(`Failed to process scan: ${errMsg}`);
-      }
+      alert(`Failed to process scan: ${errMsg}`);
       updateState({ isProcessing: false });
     }
   };
