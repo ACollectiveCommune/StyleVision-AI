@@ -584,9 +584,9 @@ const App: React.FC = () => {
         activeAI180ScanId: scanId,
         isProcessing: false
       });
-    } catch (err) {
+    } catch (err: any) {
       console.error("Failed to process AI 180 capture:", err);
-      alert("Failed to process scan. Please try again.");
+      alert(`Failed to process scan: ${err?.message || err}`);
       updateState({ isProcessing: false });
     }
   };

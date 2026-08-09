@@ -102,6 +102,11 @@ export const AI180Capture: React.FC<AI180CaptureProps> = ({ onCaptureComplete, o
         let targetWidth = video.videoWidth;
         let targetHeight = video.videoHeight;
 
+        if (targetWidth <= 0 || targetHeight <= 0) {
+          targetWidth = 1080;
+          targetHeight = 1920;
+        }
+
         if (targetWidth > maxDim || targetHeight > maxDim) {
           if (targetWidth > targetHeight) {
             targetHeight = Math.round((targetHeight * maxDim) / targetWidth);
