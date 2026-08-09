@@ -90,7 +90,7 @@ def generate_head_mesh(images_data, hair_rgb=(60, 50, 42)):
             # Scale settings matching ThreeDSplatViewer fallback
             scaleZ = 2.0
             scaleX = 2.0
-            scaleY = -2.8
+            scaleY = 2.8
             
             x = scaleX * sin_lat * sin_lon
             y = scaleY * cos_lat

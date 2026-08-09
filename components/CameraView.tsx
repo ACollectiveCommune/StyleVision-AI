@@ -170,12 +170,12 @@ export const CameraView: React.FC<CameraViewProps> = ({ onCapture, onCapture3DBu
       }
 
       // Guide message updates based on frame index
-      if (currentFrame < 10) {
-        setScanInstructions('⬅ TURN SLOWLY TO LEFT PROFILE...');
-      } else if (currentFrame < 25) {
-        setScanInstructions('➡ TURN SLOWLY BACK TO FRONT...');
+      if (currentFrame < 12) {
+        setScanInstructions('👤 FACE FORWARD (LOOK FRONT)');
+      } else if (currentFrame < 26) {
+        setScanInstructions('⬅ SLOWLY TURN LEFT');
       } else {
-        setScanInstructions('➡ CONTINUE TO RIGHT PROFILE...');
+        setScanInstructions('➡ SLOWLY TURN RIGHT');
       }
 
       if (ctx && video) {

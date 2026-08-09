@@ -419,52 +419,34 @@ export const ThreeDSplatViewer: React.FC<ThreeDSplatViewerProps> = ({
         const ny = -cosTheta;
         const nz = sinTheta * cosPhi;
 
-        // Calculate weights for projection
-        let w_front = Math.max(0, nz) ** 2.5;
-        let w_left = Math.max(0, -nx) ** 2.5;
-        let w_right = Math.max(0, nx) ** 2.5;
-        let w_fl = Math.max(0, -nx * 0.707 + nz * 0.707) ** 2.5;
-        let w_fr = Math.max(0, nx * 0.707 + nz * 0.707) ** 2.5;
+        // Front face visibility weight
+        const faceWeight = Math.max(0.0, nz) ** 2.0;
 
-        const total_w = w_front + w_left + w_right + w_fl + w_fr;
-        let r = 200, g = 200, b = 200;
+        // Hair backdrop base color
+        let r = Math.floor(hairRGB.r * 0.45);
+        let g = Math.floor(hairRGB.g * 0.45);
+        let b = Math.floor(hairRGB.b * 0.45);
 
-        if (total_w > 0) {
-          let r_sum = 0, g_sum = 0, b_sum = 0;
+        // Map front camera if sampler is available
+        if (faceWeight > 0.01 && samplers["front"]) {
+          const sampler = samplers["front"];
+          const sw = sampler.width;
+          const sh = sampler.height;
 
-          const views = [
-            { angle: "front", w: w_front, u_lookup: (nx + 1.0) / 2.0 },
-            { angle: "left", w: w_left, u_lookup: (nz + 1.0) / 2.0 },
-            { angle: "right", w: w_right, u_lookup: (1.0 - nz) / 2.0 },
-            { angle: "front_left", w: w_fl, u_lookup: (nx * 0.707 + nz * 0.707 + 1.0) / 2.0 },
-            { angle: "front_right", w: w_fr, u_lookup: (nx * 0.707 - nz * 0.707 + 1.0) / 2.0 }
-          ];
+          // Align front coordinates symmetrically
+          const u_lookup = (nx + 1.0) / 2.0;
+          const sx = Math.max(0, Math.min(sw - 1, Math.floor(u_lookup * sw)));
+          const sy = Math.max(0, Math.min(sh - 1, Math.floor(v * sh)));
+          const idx = (sy * sw + sx) * 4;
 
-          for (const view of views) {
-            if (view.w > 0 && samplers[view.angle]) {
-              const sampler = samplers[view.angle];
-              const sw = sampler.width;
-              const sh = sampler.height;
-              const sx = Math.max(0, Math.min(sw - 1, Math.floor(view.u_lookup * sw)));
-              const sy = Math.max(0, Math.min(sh - 1, Math.floor(v * sh)));
-              const idx = (sy * sw + sx) * 4;
-              
-              r_sum += sampler.data[idx] * view.w;
-              g_sum += sampler.data[idx+1] * view.w;
-              b_sum += sampler.data[idx+2] * view.w;
-            }
-          }
+          const fr = sampler.data[idx];
+          const fg = sampler.data[idx+1];
+          const fb = sampler.data[idx+2];
 
-          r = Math.floor(r_sum / total_w);
-          g = Math.floor(g_sum / total_w);
-          b = Math.floor(b_sum / total_w);
-        }
-
-        // Back-of-head dark hair/shadow color fill
-        if (total_w <= 0.05) {
-          r = hairRGB.r * 0.45;
-          g = hairRGB.g * 0.45;
-          b = hairRGB.b * 0.45;
+          // Blend the face texture continuously with the solid hair background
+          r = Math.floor(fr * faceWeight + r * (1.0 - faceWeight));
+          g = Math.floor(fg * faceWeight + g * (1.0 - faceWeight));
+          b = Math.floor(fb * faceWeight + b * (1.0 - faceWeight));
         }
 
         const pixelIdx = (py * width + px) * 4;
@@ -500,7 +482,7 @@ export const ThreeDSplatViewer: React.FC<ThreeDSplatViewerProps> = ({
         const cosPhi = Math.cos(phi);
 
         let scaleX = 2.0;
-        let scaleY = -2.8;
+        let scaleY = 2.8;
         let scaleZ = 2.0;
 
         let x = scaleX * sinTheta * sinPhi;
@@ -1103,22 +1085,13 @@ export const ThreeDSplatViewer: React.FC<ThreeDSplatViewerProps> = ({
         </div>
 
         <div className="flex-[2] text-center min-w-0 px-2">
-          <h2 className="text-xs sm:text-sm font-black bg-gradient-to-r from-yellow-400 to-amber-500 bg-clip-text text-transparent uppercase tracking-wider truncate">
-            ✨ Volumetric 3D Splat Mirror
+          <h2 className="text-xs sm:text-sm font-black bg-gradient-to-r from-indigo-400 to-violet-500 bg-clip-text text-transparent uppercase tracking-wider truncate">
+            ✨ 3D Head Scan Mirror
           </h2>
         </div>
 
         <div className="flex-1 flex justify-end gap-1.5">
-          <button
-            onClick={() => setShowDiagnostics(!showDiagnostics)}
-            className={`px-2.5 py-1.5 rounded-lg text-[10px] font-extrabold uppercase tracking-wider transition ${
-              showDiagnostics 
-                ? 'bg-amber-500 text-neutral-950 shadow-lg' 
-                : 'bg-white/5 border border-white/10 text-neutral-400 hover:text-white'
-            }`}
-          >
-            ⚙ Debug
-          </button>
+          {/* Hide Debug from consumer interface */}
         </div>
       </div>
 
@@ -1128,7 +1101,7 @@ export const ThreeDSplatViewer: React.FC<ThreeDSplatViewerProps> = ({
         {/* Loading Overlay */}
         {loadingText && (
           <div className="absolute inset-0 bg-slate-950/90 backdrop-blur-md flex flex-col items-center justify-center gap-3 z-50">
-            <div className="w-10 h-10 border-4 border-yellow-500/30 border-t-yellow-500 rounded-full animate-spin"></div>
+            <div className="w-10 h-10 border-4 border-indigo-500/30 border-t-indigo-500 rounded-full animate-spin"></div>
             <span className="text-[10px] font-black uppercase tracking-widest text-neutral-300">{loadingText}</span>
           </div>
         )}
@@ -1146,14 +1119,9 @@ export const ThreeDSplatViewer: React.FC<ThreeDSplatViewerProps> = ({
           
           {/* Status Indicator */}
           <div className="text-center py-2 bg-slate-950 border-b border-white/5 z-20 flex-shrink-0 flex flex-col items-center gap-1">
-            <span className="text-[9px] text-yellow-400 font-extrabold uppercase tracking-widest bg-yellow-500/10 px-3 py-1 rounded-full border border-yellow-500/20">
-              {plyModelPoints ? "Live 3D Reconstructed Model" : isDemoMode ? "3D Demo Mode (Sample Model)" : "Background Removed (Studio Backdrop)"}
+            <span className="text-[9px] text-indigo-400 font-extrabold uppercase tracking-widest bg-indigo-500/10 px-3 py-1 rounded-full border border-indigo-500/20">
+              {runpodModelData ? "Live 3D Reconstructed Model" : "3D Head Scan Preview"}
             </span>
-            {isDemoMode && (
-              <span className="text-[8px] text-neutral-400 font-extrabold uppercase tracking-wider">
-                Scan your face in the 180° camera tab to view yourself in 3D!
-              </span>
-            )}
           </div>
 
           <div 
@@ -1225,7 +1193,7 @@ export const ThreeDSplatViewer: React.FC<ThreeDSplatViewerProps> = ({
                     : 'bg-white/5 border-white/5 text-neutral-400 hover:text-white'
                 }`}
               >
-                🎥 {viewMode === '25d' ? "2.5D Interpolated" : "3D Point Cloud"}
+                🎥 {viewMode === '25d' ? "2.5D View" : "3D Head Scan"}
               </button>
 
               {/* Auto Play spin */}
