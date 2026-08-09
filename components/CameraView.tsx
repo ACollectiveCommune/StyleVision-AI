@@ -3,74 +3,38 @@ import { Icons } from '../constants';
 
 interface CameraViewProps {
   onCapture: (imageDataUrl: string) => void;
+  onCapture3DBust?: (frames: string[]) => void;
   isActive: boolean;
 }
 
-const PRESET_MODELS = [
-  {
-    id: 'male_1',
-    name: 'Ethan',
-    gender: 'Male',
-    url: 'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?auto=format&fit=crop&q=80&w=600&h=800',
-    thumbnail: 'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?auto=format&fit=crop&q=80&w=150&h=200'
-  },
-  {
-    id: 'male_2',
-    name: 'Marcus',
-    gender: 'Male',
-    url: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&q=80&w=600&h=800',
-    thumbnail: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&q=80&w=150&h=200'
-  },
-  {
-    id: 'female_1',
-    name: 'Sophia',
-    gender: 'Female',
-    url: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&q=80&w=600&h=800',
-    thumbnail: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&q=80&w=150&h=200'
-  },
-  {
-    id: 'female_2',
-    name: 'Chloe',
-    gender: 'Female',
-    url: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?auto=format&fit=crop&q=80&w=600&h=800',
-    thumbnail: 'https://images.unsplash.com/photo-1438761681033-6461ffad80?auto=format&fit=crop&q=80&w=150&h=200'
-  }
-];
-
-const convertUrlToBase64 = (url: string): Promise<string> => {
-  return new Promise((resolve, reject) => {
-    const img = new Image();
-    img.crossOrigin = 'anonymous';
-    img.onload = () => {
-      const canvas = document.createElement('canvas');
-      canvas.width = img.width;
-      canvas.height = img.height;
-      const ctx = canvas.getContext('2d');
-      if (ctx) {
-        ctx.drawImage(img, 0, 0);
-        try {
-          const dataUrl = canvas.toDataURL('image/jpeg', 0.9);
-          resolve(dataUrl);
-        } catch (e) {
-          reject(e);
-        }
-      } else {
-        reject(new Error('Failed to get 2d context'));
-      }
-    };
-    img.onerror = (e) => reject(e);
-    img.src = url;
-  });
-};
-
-export const CameraView: React.FC<CameraViewProps> = ({ onCapture, isActive }) => {
+export const CameraView: React.FC<CameraViewProps> = ({ onCapture, onCapture3DBust, isActive }) => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const localFileInputRef = useRef<HTMLInputElement>(null);
   
   const [permissionError, setPermissionError] = useState<boolean>(false);
-  const [loadingPresetId, setLoadingPresetId] = useState<string | null>(null);
   const [conversionError, setConversionError] = useState<string | null>(null);
+  const [facingMode, setFacingMode] = useState<'user' | 'environment'>('user');
+  const [hasMultipleCameras, setHasMultipleCameras] = useState<boolean>(false);
+
+  // 3D Guided Scanning States
+  const [scanState, setScanState] = useState<'idle' | 'countdown' | 'capturing'>('idle');
+  const [countdown, setCountdown] = useState<number>(3);
+  const [scanProgress, setScanProgress] = useState<number>(0);
+  const [scanInstructions, setScanInstructions] = useState<string>('Align face and look straight');
+
+  useEffect(() => {
+    const checkDevices = async () => {
+      try {
+        const devices = await navigator.mediaDevices.enumerateDevices();
+        const videoDevices = devices.filter(d => d.kind === 'videoinput');
+        setHasMultipleCameras(videoDevices.length > 1);
+      } catch (e) {
+        console.warn("Enumerate devices failed:", e);
+      }
+    };
+    checkDevices();
+  }, []);
 
   useEffect(() => {
     let stream: MediaStream | null = null;
@@ -81,52 +45,47 @@ export const CameraView: React.FC<CameraViewProps> = ({ onCapture, isActive }) =
       setPermissionError(false);
 
       try {
-        // Attempt 1: High quality
         try {
           stream = await navigator.mediaDevices.getUserMedia({
             video: { 
-              facingMode: 'user', 
+              facingMode: facingMode, 
               width: { ideal: 1920 }, 
               height: { ideal: 1080 } 
             },
-            audio: false,
+            audio: false
           });
-        } catch (e) {
-          console.warn("High res camera failed, trying default", e);
-          // Attempt 2: Basic fallback (fixes "Permission denied" caused by constraints)
+        } catch (err) {
+          console.warn("Failed high quality camera stream, falling back to standard resolution:", err);
           stream = await navigator.mediaDevices.getUserMedia({
-            video: { facingMode: 'user' },
-            audio: false,
+            video: { facingMode: facingMode },
+            audio: false
           });
         }
 
-        if (mounted && videoRef.current && stream) {
+        if (mounted && videoRef.current) {
           videoRef.current.srcObject = stream;
-          await videoRef.current.play();
         }
-      } catch (err) {
-        console.error("Camera error:", err);
-        if (mounted) setPermissionError(true);
+      } catch (err: any) {
+        console.error("Camera access error:", err);
+        if (mounted) {
+          setPermissionError(true);
+        }
       }
     };
 
-    if (isActive) {
-      startCamera();
-    } else {
-      if (videoRef.current && videoRef.current.srcObject) {
-        const s = videoRef.current.srcObject as MediaStream;
-        s.getTracks().forEach(t => t.stop());
-        videoRef.current.srcObject = null;
-      }
-    }
+    startCamera();
 
     return () => {
       mounted = false;
       if (stream) {
-        stream.getTracks().forEach(t => t.stop());
+        stream.getTracks().forEach(track => track.stop());
       }
     };
-  }, [isActive]);
+  }, [isActive, facingMode]);
+
+  const handleSwitchCamera = () => {
+    setFacingMode(prev => prev === 'user' ? 'environment' : 'user');
+  };
 
   const handleCapture = () => {
     if (videoRef.current && canvasRef.current) {
@@ -140,30 +99,112 @@ export const CameraView: React.FC<CameraViewProps> = ({ onCapture, isActive }) =
       
       const ctx = canvas.getContext('2d');
       if (ctx) {
-        ctx.translate(canvas.width, 0);
-        ctx.scale(-1, 1);
+        if (facingMode === 'user') {
+          ctx.translate(canvas.width, 0);
+          ctx.scale(-1, 1);
+        }
         ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
         
-        const dataUrl = canvas.toDataURL('image/jpeg', 0.9);
+        const dataUrl = canvas.toDataURL('image/jpeg', 0.95);
         onCapture(dataUrl);
       }
     }
   };
 
-  const handleSelectPreset = async (model: typeof PRESET_MODELS[0]) => {
-    if (loadingPresetId) return;
-    setLoadingPresetId(model.id);
-    setConversionError(null);
-    try {
-      const base64 = await convertUrlToBase64(model.url);
-      onCapture(base64);
-    } catch (err) {
-      console.error("Preset conversion failed:", err);
-      setConversionError(`Failed to load ${model.name}. Please upload a custom image or try again.`);
-    } finally {
-      setLoadingPresetId(null);
-    }
+  // Guided 3D Scanner Capture Loop (40 frames over 4 seconds)
+  const handleStart3DScan = () => {
+    if (scanState !== 'idle') return;
+    setScanState('countdown');
+    setCountdown(3);
+    setScanProgress(0);
+    setScanInstructions('PREPARE TO TURN HEAD');
   };
+
+  useEffect(() => {
+    if (scanState !== 'countdown') return;
+
+    const timer = setInterval(() => {
+      setCountdown(prev => {
+        if (prev <= 1) {
+          clearInterval(timer);
+          // Start actual high-frequency capture
+          setScanState('capturing');
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, [scanState]);
+
+  useEffect(() => {
+    if (scanState !== 'capturing' || !onCapture3DBust) return;
+
+    const video = videoRef.current;
+    const canvas = canvasRef.current;
+    if (!video || !canvas) {
+      setScanState('idle');
+      return;
+    }
+
+    const capturedFrames: string[] = [];
+    const totalFrames = 40;
+    let currentFrame = 0;
+
+    // Set canvas dimensions
+    canvas.width = 480; // Optimize dimension for fast ML processing
+    canvas.height = 640;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) {
+      setScanState('idle');
+      return;
+    }
+
+    const captureInterval = setInterval(() => {
+      if (currentFrame >= totalFrames) {
+        clearInterval(captureInterval);
+        setScanState('idle');
+        onCapture3DBust(capturedFrames);
+        return;
+      }
+
+      // Guide message updates based on frame index
+      if (currentFrame < 10) {
+        setScanInstructions('⬅ TURN SLOWLY TO LEFT PROFILE...');
+      } else if (currentFrame < 25) {
+        setScanInstructions('➡ TURN SLOWLY BACK TO FRONT...');
+      } else {
+        setScanInstructions('➡ CONTINUE TO RIGHT PROFILE...');
+      }
+
+      if (ctx && video) {
+        ctx.save();
+        if (facingMode === 'user') {
+          ctx.translate(canvas.width, 0);
+          ctx.scale(-1, 1);
+        }
+        
+        // Draw cropped/centered face canvas
+        const srcWidth = video.videoWidth;
+        const srcHeight = video.videoHeight;
+        const size = Math.min(srcWidth, srcHeight);
+        const sx = (srcWidth - size) / 2;
+        const sy = (srcHeight - size) / 2;
+        
+        ctx.drawImage(video, sx, sy, size, size, 0, 0, canvas.width, canvas.height);
+        ctx.restore();
+
+        const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+        capturedFrames.push(dataUrl);
+      }
+
+      currentFrame++;
+      setScanProgress(Math.floor((currentFrame / totalFrames) * 100));
+    }, 100); // 10 frames per second (40 frames over 4 seconds)
+
+    return () => clearInterval(captureInterval);
+  }, [scanState, facingMode, onCapture3DBust]);
 
   const handleLocalUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -180,12 +221,10 @@ export const CameraView: React.FC<CameraViewProps> = ({ onCapture, isActive }) =
   if (!isActive) return null;
 
   return (
-    <div id="camera-view-container" className="absolute inset-0 bg-neutral-950 flex flex-col items-center justify-between overflow-y-auto no-scrollbar z-10 p-6 pt-24 pb-28">
+    <div id="camera-view-container" className="absolute inset-0 bg-neutral-950 flex flex-col items-center justify-between overflow-y-auto no-scrollbar z-10 p-6 pt-24 pb-36">
       {permissionError ? (
-        // Gorgeous Fallback UI for Permission Denied Screen
         <div className="w-full max-w-md mx-auto my-auto flex flex-col items-center justify-center space-y-6">
           <div className="w-16 h-16 rounded-full bg-red-500/10 border border-red-500/20 flex items-center justify-center text-red-400">
-            {/* Custom Camera Off Icon */}
             <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <line x1="2" y1="2" x2="22" y2="22" />
               <path d="M7 21h10a2 2 0 0 0 2-2V9.4a2 2 0 0 0-.5-1.4l-2.5-3A2 2 0 0 0 14.5 4h-4a2 2 0 0 0-1.4.5L7.4 6.7M12 13a3 3 0 1 0 3 3" />
@@ -195,11 +234,10 @@ export const CameraView: React.FC<CameraViewProps> = ({ onCapture, isActive }) =
           <div className="text-center space-y-2">
             <h2 className="text-xl font-bold tracking-tight text-white">Camera Access Restricted</h2>
             <p className="text-xs text-neutral-400 leading-relaxed px-4">
-              Camera access is unavailable in this environment. Try on stunning virtual hairstyles instantly using our preset model portraits below, or upload your own.
+              Camera access is unavailable in this environment. Please upload your own photo from your device gallery to start your hair & style try-on.
             </p>
           </div>
 
-          {/* Upload Button */}
           <button
             id="camera-upload-fallback"
             onClick={() => localFileInputRef.current?.click()}
@@ -214,92 +252,110 @@ export const CameraView: React.FC<CameraViewProps> = ({ onCapture, isActive }) =
               {conversionError}
             </p>
           )}
-
-          {/* Presets Grid */}
-          <div className="w-full pt-4 border-t border-white/5">
-            <p className="text-[10px] font-bold text-neutral-400 uppercase tracking-widest text-center mb-4">Or choose a model portrait</p>
-            <div className="grid grid-cols-2 gap-3">
-              {PRESET_MODELS.map((model) => (
-                <button
-                  key={model.id}
-                  id={`preset-model-${model.id}`}
-                  onClick={() => handleSelectPreset(model)}
-                  disabled={!!loadingPresetId}
-                  className="group relative flex flex-col items-center bg-neutral-900/50 hover:bg-neutral-900/80 border border-white/5 hover:border-white/10 rounded-xl overflow-hidden p-2 transition-all text-left disabled:opacity-50"
-                >
-                  <div className="relative w-full aspect-[4/5] rounded-lg overflow-hidden bg-neutral-950 mb-2">
-                    <img 
-                      src={model.thumbnail} 
-                      alt={model.name} 
-                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300 animate-in fade-in"
-                    />
-                    {loadingPresetId === model.id && (
-                      <div className="absolute inset-0 bg-black/75 flex flex-col items-center justify-center text-center p-2">
-                        <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-white mb-2"></div>
-                        <span className="text-[10px] font-medium text-white/90">Preparing...</span>
-                      </div>
-                    )}
-                  </div>
-                  <div className="w-full flex justify-between items-center px-1">
-                    <span className="text-xs font-semibold text-white/95">{model.name}</span>
-                    <span className="text-[9px] font-medium text-neutral-500 px-1.5 py-0.5 bg-neutral-800 rounded-full">{model.gender}</span>
-                  </div>
-                </button>
-              ))}
-            </div>
-          </div>
         </div>
       ) : (
-        // Active Camera View
         <div className="absolute inset-0 flex flex-col items-center justify-between overflow-hidden">
           <video
             ref={videoRef}
-            className="absolute inset-0 w-full h-full object-cover transform -scale-x-100"
+            className={`absolute inset-0 w-full h-full object-cover ${facingMode === 'user' ? 'transform -scale-x-100' : ''}`}
             playsInline
             muted
             autoPlay
           />
           <canvas ref={canvasRef} className="hidden" />
 
-          {/* Top Align Hint Overlay */}
+          {/* Switch Camera Button */}
+          {hasMultipleCameras && scanState === 'idle' && (
+            <button
+              type="button"
+              onClick={handleSwitchCamera}
+              className="absolute top-28 right-6 z-30 w-10 h-10 rounded-full bg-black/45 backdrop-blur-xl border border-white/10 flex items-center justify-center text-white active:scale-90 transition-all shadow-lg pointer-events-auto"
+              title="Switch camera"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/>
+              </svg>
+            </button>
+          )}
+
+          {/* Guided Scanner Instructions Bar */}
           <div className="absolute top-28 left-0 right-0 text-center z-20 pointer-events-none">
-            <p className="text-white/80 text-xs font-medium drop-shadow-md bg-black/40 inline-block px-4 py-1.5 rounded-full backdrop-blur-md border border-white/5">
-              Align face & tap capture
+            <p className={`text-white text-xs font-black uppercase tracking-widest drop-shadow-md inline-block px-6 py-2.5 rounded-2xl backdrop-blur-xl border border-white/10 transition-all ${
+              scanState === 'capturing' ? 'bg-indigo-900/60 border-indigo-500 shadow-[0_0_15px_rgba(79,70,229,0.3)]' : 'bg-black/45'
+            }`}>
+              {scanState === 'idle' && "Align face & tap capture"}
+              {scanState === 'countdown' && `Starting in ${countdown}...`}
+              {scanState === 'capturing' && scanInstructions}
             </p>
           </div>
 
-          {/* Quick-Access Presets at the bottom of the active camera view */}
-          <div className="absolute bottom-36 left-0 right-0 z-20 flex flex-col items-center space-y-3 pointer-events-none">
-            {/* Quick model list */}
-            <div className="flex gap-2.5 px-4 overflow-x-auto no-scrollbar py-1 pointer-events-auto max-w-full">
-              {PRESET_MODELS.map((model) => (
-                <button
-                  key={model.id}
-                  id={`quick-preset-${model.id}`}
-                  onClick={() => handleSelectPreset(model)}
-                  disabled={!!loadingPresetId}
-                  className="flex items-center gap-1.5 bg-black/50 hover:bg-black/70 backdrop-blur-md border border-white/10 rounded-full pl-1.5 pr-3 py-1 text-xs font-semibold text-white/90 transition-all active:scale-95 disabled:opacity-50"
-                >
-                  <img src={model.thumbnail} alt={model.name} className="w-5 h-5 rounded-full object-cover border border-white/20" />
-                  <span>{model.name}</span>
-                </button>
-              ))}
+          {/* Guided Face Overlay Ring during scanning */}
+          {scanState !== 'idle' && (
+            <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none z-10">
+              <div className={`w-[260px] h-[340px] rounded-[130px/170px] border-[3px] transition-all duration-300 ${
+                scanState === 'countdown' ? 'border-amber-400/40 animate-pulseScale' : 'border-indigo-400 animate-radarScan'
+              }`} style={{ boxShadow: '0 0 0 9999px rgba(0,0,0,0.5)' }}>
+                {/* Crosshairs */}
+                <div className="absolute top-1/2 left-0 right-0 h-0.5 bg-white/10"></div>
+                <div className="absolute left-1/2 top-0 bottom-0 w-0.5 bg-white/10"></div>
+              </div>
+              <p className="mt-4 text-[10px] text-neutral-300 font-bold uppercase tracking-widest text-center px-6">
+                {scanState === 'countdown' ? 'Prepare to slowly turn your head left to right' : `Scan progress: ${scanProgress}%`}
+              </p>
             </div>
+          )}
 
-            {/* Main Capture Button */}
-            <button
-              id="camera-capture-button"
-              onClick={handleCapture}
-              className="w-18 h-18 rounded-full border-[4px] border-white/40 bg-white/20 hover:bg-white/30 backdrop-blur-md transition-all flex items-center justify-center active:scale-95 shadow-[0_0_20px_rgba(0,0,0,0.4)] pointer-events-auto"
-              aria-label="Take Photo"
-            >
-              <div className="w-14 h-14 bg-white rounded-full shadow-inner"></div>
-            </button>
-          </div>
+          {/* Action buttons footer */}
+          {scanState === 'idle' ? (
+            <div className="absolute bottom-[calc(5.75rem+env(safe-area-inset-bottom,0px))] left-0 right-0 z-20 flex items-center justify-center gap-6 pointer-events-none">
+              {/* Local File Upload Button */}
+              <button
+                type="button"
+                onClick={() => localFileInputRef.current?.click()}
+                className="w-11 h-11 rounded-full bg-black/45 backdrop-blur-xl border border-white/10 flex items-center justify-center text-white active:scale-90 transition-all pointer-events-auto shadow-md"
+                title="Upload Photo"
+              >
+                <Icons.Album />
+              </button>
+
+              {/* Main Shutter Button */}
+              <button
+                id="camera-capture-button"
+                onClick={handleCapture}
+                className="w-18 h-18 rounded-full border-[4px] border-white/40 bg-white/20 hover:bg-white/30 backdrop-blur-md transition-all flex items-center justify-center active:scale-95 shadow-[0_0_20px_rgba(0,0,0,0.4)] pointer-events-auto"
+                aria-label="Take Photo"
+              >
+                <div className="w-14 h-14 bg-white rounded-full shadow-inner"></div>
+              </button>
+
+              {/* Guided 3D Scan Button */}
+              {onCapture3DBust && (
+                <button
+                  type="button"
+                  onClick={handleStart3DScan}
+                  className="w-11 h-11 rounded-full bg-indigo-600 hover:bg-indigo-500 backdrop-blur-xl border border-indigo-400/30 flex items-center justify-center text-white active:scale-90 transition-all pointer-events-auto shadow-lg shadow-indigo-600/30"
+                  title="Guided 3D bust scan"
+                >
+                  <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
+                  </svg>
+                </button>
+              )}
+            </div>
+          ) : (
+            // Scanning progress indicator
+            <div className="absolute bottom-[calc(5.75rem+env(safe-area-inset-bottom,0px))] left-0 right-0 z-20 flex flex-col items-center justify-center px-12 pointer-events-none">
+              <div className="w-full max-w-xs h-1.5 bg-neutral-900 border border-white/5 rounded-full overflow-hidden">
+                <div 
+                  className="h-full bg-indigo-500 transition-all duration-100 ease-out"
+                  style={{ width: `${scanProgress}%` }}
+                />
+              </div>
+            </div>
+          )}
         </div>
       )}
 
-      {/* Hidden local file input for fallbacks */}
       <input 
         type="file" 
         ref={localFileInputRef} 

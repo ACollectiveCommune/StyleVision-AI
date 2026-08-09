@@ -14,6 +14,7 @@ import {
   getFirestore, 
   collection, 
   addDoc, 
+  setDoc,
   updateDoc,
   deleteDoc,
   doc, 
@@ -244,7 +245,7 @@ export const uploadImageToStorage = async (
   base64DataUrl: string, 
   type: 'original' | 'generated'
 ): Promise<string> => {
-  if (isFirebaseEnabled) {
+  if (isFirebaseEnabled && uid !== "guest_user_local") {
     const matches = base64DataUrl.match(/^data:(.+);base64,(.+)$/);
     if (!matches || matches.length !== 3) {
       throw new Error("Invalid image format for upload");
@@ -283,6 +284,11 @@ export interface SavedGeneration {
   hairColor: string;
   beardStyle: string;
   beardColor: string;
+  outfit?: string;
+  makeup?: string;
+  eyeColor?: string;
+  treatments?: Array<{ treatmentId: string; value: number; label: string }>;
+  customPrompt?: string;
   gender: string;
   timestamp?: any;
   isFavorite: boolean;
@@ -293,7 +299,7 @@ export const saveGeneration = async (
   uid: string, 
   generation: Omit<SavedGeneration, 'id' | 'timestamp'>
 ): Promise<string> => {
-  if (isFirebaseEnabled) {
+  if (isFirebaseEnabled && uid !== "guest_user_local") {
     const historyRef = collection(db, 'users', uid, 'history');
     const docRef = await addDoc(historyRef, {
       ...generation,
@@ -319,7 +325,7 @@ export const toggleFavorite = async (
   docId: string, 
   isFavorite: boolean
 ): Promise<void> => {
-  if (isFirebaseEnabled) {
+  if (isFirebaseEnabled && uid !== "guest_user_local") {
     const docRef = doc(db, 'users', uid, 'history', docId);
     await updateDoc(docRef, { isFavorite });
   } else {
@@ -336,7 +342,7 @@ export const deleteGeneration = async (
   uid: string, 
   docId: string
 ): Promise<void> => {
-  if (isFirebaseEnabled) {
+  if (isFirebaseEnabled && uid !== "guest_user_local") {
     const docRef = doc(db, 'users', uid, 'history', docId);
     await deleteDoc(docRef);
   } else {
@@ -347,7 +353,7 @@ export const deleteGeneration = async (
 };
 
 export const fetchUserHistory = async (uid: string): Promise<SavedGeneration[]> => {
-  if (isFirebaseEnabled) {
+  if (isFirebaseEnabled && uid !== "guest_user_local") {
     const historyRef = collection(db, 'users', uid, 'history');
     const q = query(historyRef, orderBy('timestamp', 'desc'), limit(50));
     const querySnapshot = await getDocs(q);
@@ -374,7 +380,7 @@ export const fetchUserHistory = async (uid: string): Promise<SavedGeneration[]> 
 };
 
 export const fetchUserFavorites = async (uid: string): Promise<SavedGeneration[]> => {
-  if (isFirebaseEnabled) {
+  if (isFirebaseEnabled && uid !== "guest_user_local") {
     const historyRef = collection(db, 'users', uid, 'history');
     const q = query(historyRef, where('isFavorite', '==', true), orderBy('timestamp', 'desc'));
     const querySnapshot = await getDocs(q);
@@ -397,5 +403,75 @@ export const fetchUserFavorites = async (uid: string): Promise<SavedGeneration[]
     return results;
   } else {
     return getLocalHistory().filter(i => i.isFavorite);
+  }
+};
+
+export interface FavoritedStyle {
+  id: string;
+  category: string;
+  label: string;
+  image: string;
+  gender?: string;
+}
+
+export const toggleFavoritedStyle = async (
+  uid: string,
+  style: FavoritedStyle,
+  isFavorite: boolean
+): Promise<void> => {
+  if (isFirebaseEnabled && uid !== "guest_user_local") {
+    const docRef = doc(db, 'users', uid, 'favorited_styles', style.id);
+    if (isFavorite) {
+      await setDoc(docRef, {
+        id: style.id,
+        category: style.category,
+        label: style.label,
+        image: style.image,
+        gender: style.gender || null,
+        timestamp: serverTimestamp()
+      });
+    } else {
+      await deleteDoc(docRef);
+    }
+  } else {
+    // LocalStorage fallback
+    const key = 'stylevision_favorited_styles';
+    let localFavs: FavoritedStyle[] = [];
+    try {
+      localFavs = JSON.parse(localStorage.getItem(key) || '[]');
+    } catch {}
+    if (isFavorite) {
+      if (!localFavs.some(f => f.id === style.id)) {
+        localFavs.push(style);
+      }
+    } else {
+      localFavs = localFavs.filter(f => f.id !== style.id);
+    }
+    localStorage.setItem(key, JSON.stringify(localFavs));
+  }
+};
+
+export const fetchFavoritedStyles = async (uid: string): Promise<FavoritedStyle[]> => {
+  if (isFirebaseEnabled && uid !== "guest_user_local") {
+    const favsRef = collection(db, 'users', uid, 'favorited_styles');
+    const querySnapshot = await getDocs(favsRef);
+    const results: FavoritedStyle[] = [];
+    querySnapshot.forEach((doc) => {
+      const data = doc.data();
+      results.push({
+        id: data.id,
+        category: data.category,
+        label: data.label,
+        image: data.image,
+        gender: data.gender || undefined
+      });
+    });
+    return results;
+  } else {
+    try {
+      return JSON.parse(localStorage.getItem('stylevision_favorited_styles') || '[]');
+    } catch {
+      return [];
+    }
   }
 };

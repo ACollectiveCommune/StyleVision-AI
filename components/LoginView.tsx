@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { loginWithGoogle, loginWithApple, signInAnonymously, auth } from '../services/firebase';
+import appIcon from '../assets/icon.jpg';
 
 interface LoginViewProps {
   onLoginStateChange: (loading: boolean) => void;
@@ -69,9 +70,11 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginStateChange }) => {
         
         {/* Branding & Logo */}
         <div className="flex flex-col items-center space-y-4">
-          <div className="w-20 h-20 rounded-2xl bg-gradient-to-tr from-indigo-500 to-purple-500 flex items-center justify-center shadow-lg shadow-indigo-500/20">
-            <span className="font-extrabold text-3xl tracking-tighter text-white">SV</span>
-          </div>
+          <img 
+            src={appIcon} 
+            className="w-20 h-20 rounded-2xl object-cover shadow-lg shadow-indigo-500/20 border border-white/10" 
+            alt="StyleVision Logo" 
+          />
           <div className="space-y-1">
             <h1 className="text-3xl font-extrabold tracking-tight bg-gradient-to-r from-indigo-200 via-purple-100 to-white bg-clip-text text-transparent">
               StyleVision AI

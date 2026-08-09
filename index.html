@@ -28,9 +28,14 @@
         background-color: #000;
         color: #fff;
         overflow: hidden; /* Prevent body scroll */
-        padding-top: env(safe-area-inset-top);
-        padding-bottom: env(safe-area-inset-bottom);
       }
+      .no-ios-callout {
+        -webkit-touch-callout: none !important;
+        -webkit-user-select: none !important;
+        user-select: none !important;
+        pointer-events: none !important;
+      }
+
     </style>
   <script type="importmap">
 {

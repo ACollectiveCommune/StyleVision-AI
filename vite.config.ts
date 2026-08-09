@@ -26,6 +26,7 @@ export default defineConfig(({ mode }) => {
         'process.env.FIREBASE_STORAGE_BUCKET': JSON.stringify(env.FIREBASE_STORAGE_BUCKET || env.VITE_FIREBASE_STORAGE_BUCKET),
         'process.env.FIREBASE_MESSAGING_SENDER_ID': JSON.stringify(env.FIREBASE_MESSAGING_SENDER_ID || env.VITE_FIREBASE_MESSAGING_SENDER_ID),
         'process.env.FIREBASE_APP_ID': JSON.stringify(env.FIREBASE_APP_ID || env.VITE_FIREBASE_APP_ID),
+        'process.env.RUNPOD_API_KEY': JSON.stringify(env.RUNPOD_API_KEY || env.VITE_RUNPOD_API_KEY),
       },
       resolve: {
         alias: {

@@ -5,6 +5,7 @@ import base64
 import numpy as np
 from PIL import Image
 import runpod
+import io
 
 # Initialize Firebase Admin if environment variables are provided
 try:
@@ -63,19 +64,144 @@ def calculate_camera_pose(angle_label):
     T = np.array([0.0, 0.0, 8.5])
     return R, T
 
+def generate_head_mesh(images_data, hair_rgb=(60, 50, 42)):
+    """
+    Generates a solid ovoid head mesh: vertices, face indices, UV coordinates,
+    and a pre-blended UV texture map.
+    """
+    vertices = []
+    uvs = []
+    faces = []
+    
+    lats_count = 60
+    lons_count = 60
+    
+    # 1. Generate vertices and UVs
+    for lat_idx in range(lats_count + 1):
+        lat = (lat_idx * np.pi) / lats_count
+        sin_lat = np.sin(lat)
+        cos_lat = np.cos(lat)
+        
+        for lon_idx in range(lons_count + 1):
+            lon = (lon_idx * 2 * np.pi) / lons_count
+            sin_lon = np.sin(lon)
+            cos_lon = np.cos(lon)
+            
+            # Scale settings matching ThreeDSplatViewer fallback
+            scaleZ = 2.0
+            scaleX = 2.0
+            scaleY = -2.8
+            
+            x = scaleX * sin_lat * sin_lon
+            y = scaleY * cos_lat
+            z = scaleZ * sin_lat * cos_lon
+            
+            vertices.extend([float(x), float(y), float(z)])
+            
+            u = 1.0 - (lon_idx / lons_count)
+            v = 1.0 - (lat_idx / lats_count)
+            uvs.extend([float(u), float(v)])
+            
+    # 2. Generate face indices (triangles)
+    for lat_idx in range(lats_count):
+        for lon_idx in range(lons_count):
+            first = lat_idx * (lons_count + 1) + lon_idx
+            second = first + lons_count + 1
+            
+            # Triangle 1
+            faces.extend([int(first), int(second), int(first + 1)])
+            # Triangle 2
+            faces.extend([int(second), int(second + 1), int(first + 1)])
+            
+    # 3. Create pre-blended texture map (512x512 canvas)
+    tex_w, tex_h = 512, 512
+    texture_img = Image.new("RGB", (tex_w, tex_h), (200, 200, 200))
+    pixels = texture_img.load()
+    
+    for py in range(tex_h):
+        v_val = py / tex_h
+        theta = v_val * np.pi
+        sin_theta = np.sin(theta)
+        cos_theta = np.cos(theta)
+        
+        for px in range(tex_w):
+            u_val = px / tex_w
+            phi = (u_val * 2 * np.pi) - np.pi
+            sin_phi = np.sin(phi)
+            cos_phi = np.cos(phi)
+            
+            # Surface unit normals
+            nx = sin_theta * sin_phi
+            ny = -cos_theta
+            nz = sin_theta * cos_phi
+            
+            w_front = max(0.0, nz) ** 2.5
+            w_left = max(0.0, -nx) ** 2.5
+            w_right = max(0.0, nx) ** 2.5
+            w_fl = max(0.0, -nx * 0.707 + nz * 0.707) ** 2.5
+            w_fr = max(0.0, nx * 0.707 + nz * 0.707) ** 2.5
+            
+            total_w = w_front + w_left + w_right + w_fl + w_fr
+            
+            r, g, b = 200, 200, 200
+            
+            if total_w > 0:
+                r_sum, g_sum, b_sum = 0, 0, 0
+                
+                views = [
+                    ("front", w_front, (nx + 1.0)/2.0),
+                    ("left", w_left, (nz + 1.0)/2.0),
+                    ("right", w_right, (1.0 - nz)/2.0),
+                    ("front_left", w_fl, (nx*0.707 + nz*0.707 + 1.0)/2.0),
+                    ("front_right", w_fr, (nx*0.707 - nz*0.707 + 1.0)/2.0)
+                ]
+                
+                for angle, w, u_lookup in views:
+                    if w > 0 and angle in images_data:
+                        img = images_data[angle]
+                        img_w, img_h = img.size
+                        sx = max(0, min(img_w - 1, int(u_lookup * img_w)))
+                        sy = max(0, min(img_h - 1, int(v_val * img_h)))
+                        pr, pg, pb = img.getpixel((sx, sy))
+                        r_sum += pr * w
+                        g_sum += pg * w
+                        b_sum += pb * w
+                        
+                r = int(r_sum / total_w)
+                g = int(g_sum / total_w)
+                b = int(b_sum / total_w)
+            
+            if total_w <= 0.05:
+                r = int(hair_rgb[0] * 0.45)
+                g = int(hair_rgb[1] * 0.45)
+                b = int(hair_rgb[2] * 0.45)
+                
+            pixels[px, py] = (r, g, b)
+            
+    # Convert texture image to base64
+    buffered = io.BytesIO()
+    texture_img.save(buffered, format="JPEG", quality=85)
+    img_str = base64.b64encode(buffered.getvalue()).decode("utf-8")
+    data_url = f"data:image/jpeg;base64,{img_str}"
+    
+    return {
+        "vertices": vertices,
+        "faces": faces,
+        "uvs": uvs,
+        "texture": data_url
+    }
+
 def generate_splat_cloud(images_data):
     """
     Compiles downloaded frames into a dense .ply point cloud using 3D normal estimation.
     """
     points = []
     
-    # Construct base ellipsoid (ovoid head coordinates)
     lats = np.linspace(-np.pi/2, np.pi/2, 90)
     lons = np.linspace(-np.pi, np.pi, 90)
     
     for lat in lats:
         for lon in lons:
-            # Ellipsoid axes (5.0, 6.5, 5.0)
             x = 5.0 * np.cos(lat) * np.sin(lon)
             y = -6.5 * np.sin(lat)
             z = 5.0 * np.cos(lat) * np.cos(lon)
@@ -84,10 +210,6 @@ def generate_splat_cloud(images_data):
             ny = -np.sin(lat)
             nz = np.cos(lat) * np.cos(lon)
             
-            # Determine projection pixel from views
-            is_face = z > 1.2 and abs(x) < 4.0 and y > -4.5 and y < 4.0
-            
-            # multi-view projection blend weights
             w_front = max(0, nz) ** 2.5
             w_left = max(0, -nx) ** 2.5
             w_right = max(0, nx) ** 2.5
@@ -99,10 +221,8 @@ def generate_splat_cloud(images_data):
             if total_w <= 0:
                 continue
                 
-            # Sample color from downloaded image pixels
             r_sum, g_sum, b_sum = 0, 0, 0
             
-            # Map views
             views = [
                 ("front", w_front, (x + 5.0)/10.0),
                 ("left", w_left, (z + 5.0)/10.0),
@@ -136,6 +256,21 @@ def write_ply(points, filename):
     """Writes compiled points to standard binary PLY format."""
     header = f"""ply
 format ascii 1.0
+element visitor {len(points)}
+property float x
+property float y
+property float z
+property uchar red
+property uchar green
+property uchar blue
+property float nx
+property float ny
+property float nz
+end_header
+"""
+    # Wait, let's write correct standard header element vertex
+    header = f"""ply
+format ascii 1.0
 element vertex {len(points)}
 property float x
 property float y
@@ -154,21 +289,6 @@ end_header
             f.write(f"{p[0]:.4f} {p[1]:.4f} {p[2]:.4f} {p[3]} {p[4]} {p[5]} {p[6]:.4f} {p[7]:.4f} {p[8]:.4f}\n")
 
 def handler(event):
-    """
-    RunPod Serverless Entry handler.
-    Expects input:
-    {
-        "images": {
-            "left": "url_or_base64",
-            "front_left": "url_or_base64",
-            "front": "url_or_base64",
-            "front_right": "url_or_base64",
-            "right": "url_or_base64"
-        },
-        "userId": "user_id_string",
-        "jobId": "job_id_string"
-    }
-    """
     job_input = event.get("input", {})
     images = job_input.get("images", {})
     user_id = job_input.get("userId", "guest")
@@ -192,7 +312,6 @@ def handler(event):
             
         local_images[angle] = local_path
         
-        # Load via PIL for pixel sampling
         try:
             img = Image.open(local_path).convert("RGB")
             images_data[angle] = img
@@ -208,14 +327,16 @@ def handler(event):
             "translation": T.tolist()
         }
         
-    # 3. Generate splat points
+    # 3. Generate solid head mesh
+    mesh_info = generate_head_mesh(images_data)
+
+    # 4. Generate splat points
     points = generate_splat_cloud(images_data)
     
-    # 4. Save to temporary PLY file
+    # 5. Save to temporary PLY file
     output_ply_path = f"/tmp/reconstruction_{job_id}.ply"
     write_ply(points, output_ply_path)
     
-    # Read raw PLY text to return directly in the response JSON
     ply_text = ""
     try:
         with open(output_ply_path, "r") as f:
@@ -223,7 +344,7 @@ def handler(event):
     except Exception as e:
         print(f"Failed to read local PLY file: {e}")
 
-    # 5. Upload to Firebase Storage if active (optional backup)
+    # 6. Upload to Firebase Storage if active (optional backup)
     public_url = ""
     try:
         bucket = storage.bucket()
@@ -246,6 +367,7 @@ def handler(event):
     return {
         "status": "success",
         "jobId": job_id,
+        "meshData": mesh_info,
         "plyData": ply_text,
         "modelUrl": public_url,
         "pointCount": len(points),
@@ -256,8 +378,6 @@ def handler(event):
 
 if __name__ == "__main__":
     import asyncio
-    # Initialize event loop explicitly to fix RunPod SDK bug on Python 3.9+
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
-    
     runpod.serverless.start({"handler": handler})

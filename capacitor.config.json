@@ -8,6 +8,9 @@
         "google.com",
         "apple.com"
       ]
+    },
+    "CapacitorHttp": {
+      "enabled": false
     }
   }
 }
