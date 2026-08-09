@@ -590,7 +590,9 @@ const App: React.FC = () => {
       const isQuotaError = errMsg.toLowerCase().includes("quota") || errMsg.toLowerCase().includes("exhausted");
       
       if (isQuotaError) {
-        alert("Firebase Quota Exceeded: Your daily free tier limit has been reached. Please upgrade your Firebase project to the pay-as-you-go (Blaze) plan in the Firebase Console. The Blaze plan is free for standard use and only costs a few cents if you exceed the limit, which is required for high-resolution video testing.");
+        localStorage.setItem('stylevision_force_local', 'true');
+        alert("Firebase Quota Exceeded: Your daily free limit has been reached. The app has automatically switched to LOCAL OFFLINE mode so you can continue testing all features locally. You can switch back to Cloud Mode anytime from the side menu once your billing account propagates on Google's servers.");
+        window.location.reload();
       } else {
         alert(`Failed to process scan: ${errMsg}`);
       }
@@ -1595,6 +1597,20 @@ const App: React.FC = () => {
                   className="w-full py-3 px-4 rounded-xl border border-white/5 hover:border-white/10 text-left font-extrabold text-[10px] uppercase tracking-widest text-white/70 hover:text-white transition-all"
                 >
                   Account Data Settings
+                </button>
+
+                <button
+                  onClick={() => {
+                    const forceLocal = localStorage.getItem('stylevision_force_local') === 'true';
+                    localStorage.setItem('stylevision_force_local', forceLocal ? 'false' : 'true');
+                    window.location.reload();
+                  }}
+                  className="w-full py-3 px-4 rounded-xl border border-white/5 hover:border-indigo-500/30 text-left font-extrabold text-[10px] uppercase tracking-widest text-indigo-400 hover:text-indigo-300 transition-all flex justify-between items-center bg-indigo-950/15"
+                >
+                  <span>Storage Mode</span>
+                  <span className="text-[9px] bg-indigo-500/20 px-2 py-0.5 rounded border border-indigo-500/30 font-black">
+                    {localStorage.getItem('stylevision_force_local') === 'true' ? 'LOCAL OFFLINE' : 'FIREBASE CLOUD'}
+                  </span>
                 </button>
               </nav>
             </div>

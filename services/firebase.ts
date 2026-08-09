@@ -40,7 +40,7 @@ const firebaseConfig = {
 };
 
 // Check if Firebase keys are provided
-export const isFirebaseEnabled = !!firebaseConfig.apiKey;
+export const isFirebaseEnabled = !!firebaseConfig.apiKey && localStorage.getItem('stylevision_force_local') !== 'true';
 
 let app: any = null;
 export let auth: any = null;
