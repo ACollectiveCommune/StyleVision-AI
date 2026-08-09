@@ -586,7 +586,14 @@ const App: React.FC = () => {
       });
     } catch (err: any) {
       console.error("Failed to process AI 180 capture:", err);
-      alert(`Failed to process scan: ${err?.message || err}`);
+      const errMsg = err?.message || String(err);
+      const isQuotaError = errMsg.toLowerCase().includes("quota") || errMsg.toLowerCase().includes("exhausted");
+      
+      if (isQuotaError) {
+        alert("Firebase Quota Exceeded: Your daily free tier limit has been reached. Please upgrade your Firebase project to the pay-as-you-go (Blaze) plan in the Firebase Console. The Blaze plan is free for standard use and only costs a few cents if you exceed the limit, which is required for high-resolution video testing.");
+      } else {
+        alert(`Failed to process scan: ${errMsg}`);
+      }
       updateState({ isProcessing: false });
     }
   };
