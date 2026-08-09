@@ -29,9 +29,8 @@ export const AI180Capture: React.FC<AI180CaptureProps> = ({ onCaptureComplete, o
       const constraints = {
         video: {
           facingMode,
-          width: { ideal: 640 },
-          height: { ideal: 640 },
-          aspectRatio: 1.0
+          width: { ideal: 1080 },
+          height: { ideal: 1920 }
         },
         audio: false
       };
@@ -96,13 +95,20 @@ export const AI180Capture: React.FC<AI180CaptureProps> = ({ onCaptureComplete, o
           ctx.scale(-1, 1);
         }
 
-        const srcWidth = video.videoWidth;
-        const srcHeight = video.videoHeight;
-        const size = Math.min(srcWidth, srcHeight);
-        const sx = (srcWidth - size) / 2;
-        const sy = (srcHeight - size) / 2;
+        // Dynamically match canvas size to camera feed resolution
+        if (canvas.width !== video.videoWidth || canvas.height !== video.videoHeight) {
+          canvas.width = video.videoWidth;
+          canvas.height = video.videoHeight;
+        }
 
-        ctx.drawImage(video, sx, sy, size, size, 0, 0, canvas.width, canvas.height);
+        ctx.save();
+        // Mirror front camera only
+        if (facingMode === 'user') {
+          ctx.translate(canvas.width, 0);
+          ctx.scale(-1, 1);
+        }
+
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
         ctx.restore();
 
         const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
@@ -173,13 +179,11 @@ export const AI180Capture: React.FC<AI180CaptureProps> = ({ onCaptureComplete, o
           ref={videoRef}
           playsInline
           muted
-          className={`w-full max-w-[640px] aspect-square object-cover z-0 ${facingMode === 'user' ? 'scale-x-[-1]' : ''}`}
+          className={`absolute inset-0 w-full h-full object-cover z-0 ${facingMode === 'user' ? 'scale-x-[-1]' : ''}`}
         />
 
         <canvas
           ref={canvasRef}
-          width={480}
-          height={480}
           className="hidden"
         />
 

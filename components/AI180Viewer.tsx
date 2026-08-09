@@ -24,6 +24,8 @@ import {
   getAI180StylesForScan 
 } from '../services/AI180FirestoreService';
 import { uploadImageToStorage } from '../services/firebase';
+import { saveGeneration, toggleFavorite } from '../services/firebase';
+import { downloadOrShareImage } from '../services/shareService';
 
 interface AI180ViewerProps {
   uid: string;
@@ -61,6 +63,10 @@ export const AI180Viewer: React.FC<AI180ViewerProps> = ({
   const [activeFrameIdx, setActiveFrameIdx] = useState<number>(4); // Default to Front view (index 4)
   const [isPreloading, setIsPreloading] = useState<boolean>(false);
 
+  // Favorite synchronization states
+  const [isFavorited, setIsFavorited] = useState<boolean>(false);
+  const [currentSavedDocId, setCurrentSavedDocId] = useState<string | null>(null);
+
   // Drag interaction refs
   const dragStartX = useRef<number>(0);
   const startFrameIdx = useRef<number>(4);
@@ -81,6 +87,25 @@ export const AI180Viewer: React.FC<AI180ViewerProps> = ({
     };
     loadScans();
   }, [uid]);
+
+  // Synchronize style selections from the main editor appState on mount
+  useEffect(() => {
+    if (appState.selectedHairStyle) {
+      setSelectedHair(appState.selectedHairStyle.id);
+    }
+    if (appState.selectedHairColor) {
+      setSelectedColor(appState.selectedHairColor.id);
+    }
+    if (appState.selectedBeardStyle) {
+      setSelectedBeard(appState.selectedBeardStyle.id);
+    }
+    if (appState.selectedBeardColor) {
+      setSelectedBeardColor(appState.selectedBeardColor.id);
+    }
+    if (appState.selectedOutfit) {
+      setSelectedOutfit(appState.selectedOutfit.id);
+    }
+  }, [appState]);
 
   // Preload generated images for smooth scrubbing
   const preloadImages = (urls: string[]): Promise<void> => {
@@ -212,6 +237,63 @@ export const AI180Viewer: React.FC<AI180ViewerProps> = ({
       console.error(err);
       setErrorMsg(err.message || 'AI generation failed');
       setViewState('error');
+    }
+  };
+
+  // Save current frame to device Photos/Downloads
+  const handleDownloadFrame = async () => {
+    const activeUrl = styledFrames[activeFrameIdx];
+    if (!activeUrl) return;
+    try {
+      await downloadOrShareImage(activeUrl);
+    } catch (err) {
+      console.error("Failed to save view to camera roll:", err);
+      alert("Failed to save image. Please verify permission settings.");
+    }
+  };
+
+  // Toggle look favoriting and sync with Favorites tab
+  const handleToggleFavorite = async () => {
+    if (isFavorited && currentSavedDocId) {
+      try {
+        await toggleFavorite(uid, currentSavedDocId, false);
+        setIsFavorited(false);
+        // Sync local parent creations list
+        if (appState.favoritedCreations) {
+          onUpdateState({
+            favoritedCreations: appState.favoritedCreations.filter(c => c.id !== currentSavedDocId)
+          });
+        }
+      } catch (err) {
+        console.error("Failed to unfavorite look:", err);
+      }
+    } else {
+      try {
+        const docData = {
+          originalImageUrl: selectedScan?.sourceFrames[4] || "", // Front original frame as baseline
+          generatedImageUrl: styledFrames[activeFrameIdx] || styledFrames[4] || "", // Currently active stylized view
+          hairStyle: selectedHair,
+          hairColor: selectedColor,
+          beardStyle: selectedBeard,
+          beardColor: selectedBeardColor,
+          outfit: selectedOutfit,
+          gender: appState.gender,
+          isFavorite: true,
+          createdAt: new Date().toISOString()
+        };
+
+        const docId = await saveGeneration(uid, docData);
+        setCurrentSavedDocId(docId);
+        setIsFavorited(true);
+
+        // Sync local parent creations list
+        const newGen = { id: docId, ...docData };
+        onUpdateState({
+          favoritedCreations: [newGen, ...(appState.favoritedCreations || [])]
+        });
+      } catch (err) {
+        console.error("Failed to favorite look:", err);
+      }
     }
   };
 
@@ -472,25 +554,52 @@ export const AI180Viewer: React.FC<AI180ViewerProps> = ({
             {/* Viewport Frame Box Container */}
             <div 
               ref={containerRef}
-              className="flex-1 touch-none relative overflow-hidden min-h-0 flex items-center justify-center"
+              className="flex-1 touch-none relative overflow-hidden min-h-0 flex items-center justify-center bg-neutral-950"
               onMouseDown={handleMouseDown}
               onMouseMove={handleMouseMove}
               onTouchStart={handleTouchStart}
               onTouchMove={handleTouchMove}
             >
-              {/* Radiant Studio Backdrop */}
-              <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_#ffffff_0%,_#f1f5f9_50%,_#cbd5e1_100%)] z-0"></div>
-              <div className="absolute inset-0 bg-[linear-gradient(to_right,#00000005_1px,transparent_1px),linear-gradient(to_bottom,#00000005_1px,transparent_1px)] bg-[size:20px_20px] pointer-events-none z-0"></div>
-
-              {/* Render Image (Warp / Interpolated frames view) */}
+              {/* Full-Screen Cover Render Image */}
               <img
                 src={generateIntermediateViews()}
                 alt="AI 180 Styled Face View"
-                className="w-full max-w-[640px] aspect-square object-cover z-10 shadow-2xl rounded-2xl pointer-events-none border border-white/5 select-none"
+                className="absolute inset-0 w-full h-full object-cover z-10 pointer-events-none select-none"
               />
 
-              {/* User rotation instruction indicator */}
-              <div className="absolute inset-x-0 bottom-6 text-center text-neutral-800 text-[10px] font-black uppercase tracking-widest pointer-events-none z-20">
+              {/* Floating Action Buttons (Top Right over image) */}
+              <div className="absolute top-4 right-4 flex flex-col gap-3 z-20 pointer-events-auto">
+                {/* Favorite Button */}
+                <button
+                  type="button"
+                  onClick={handleToggleFavorite}
+                  className={`w-11 h-11 rounded-full flex items-center justify-center border backdrop-blur-md transition-all active:scale-90 ${
+                    isFavorited
+                      ? 'bg-rose-500/90 border-rose-600/50 text-white shadow-[0_0_12px_rgba(244,63,94,0.5)]'
+                      : 'bg-black/60 border-white/10 text-white hover:bg-black/80'
+                  }`}
+                  title="Favorite Look"
+                >
+                  <svg className="w-5.5 h-5.5" fill={isFavorited ? "currentColor" : "none"} viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+                  </svg>
+                </button>
+
+                {/* Download Button */}
+                <button
+                  type="button"
+                  onClick={handleDownloadFrame}
+                  className="w-11 h-11 rounded-full bg-black/60 backdrop-blur-md border border-white/10 flex items-center justify-center text-white hover:bg-black/80 active:scale-90 transition-all"
+                  title="Save View to Camera Roll"
+                >
+                  <svg className="w-5.5 h-5.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                  </svg>
+                </button>
+              </div>
+
+              {/* User rotation instruction indicator overlay */}
+              <div className="absolute inset-x-0 bottom-6 text-center text-white text-[10px] font-black uppercase tracking-widest pointer-events-none z-20 drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]">
                 ◀ Drag left or right to rotate 180° ◀
               </div>
             </div>
@@ -498,7 +607,11 @@ export const AI180Viewer: React.FC<AI180ViewerProps> = ({
             {/* Back to editing customization trigger */}
             <div className="px-6 py-4 bg-slate-950 border-t border-white/5 flex flex-col gap-2 z-20 flex-shrink-0">
               <button
-                onClick={() => setViewState('customization')}
+                onClick={() => {
+                  setViewState('customization');
+                  setIsFavorited(false);
+                  setCurrentSavedDocId(null);
+                }}
                 className="w-full py-3.5 rounded-full bg-white/5 border border-white/10 hover:bg-white/10 text-xs font-black uppercase tracking-widest transition"
               >
                 Change Style Options

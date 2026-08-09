@@ -44,6 +44,9 @@ export const generateAI180Preview = async (
   const frontFrameIdx = 4;
   const styledFrames: string[] = new Array(9).fill('');
 
+  // Generate a deterministic seed number (reused for all 9 generation calls to lock hairstyle/beard/outfit visual features)
+  const sessionSeed = Math.floor(Math.random() * 900000) + 100000;
+
   // 1. Generate Front Frame (Anchor Reference)
   onProgress(10, 'Styling front face portrait...');
   
@@ -63,7 +66,7 @@ export const generateAI180Preview = async (
     eyeColorId: style.eyeColorId
   };
 
-  const frontResult = await generateStylePreview(mockFrontState, frontStyleOverride);
+  const frontResult = await generateStylePreview(mockFrontState, frontStyleOverride, sessionSeed);
   styledFrames[frontFrameIdx] = frontResult;
   geminiCallsCount++;
   
@@ -85,7 +88,7 @@ export const generateAI180Preview = async (
     };
 
     // seedOverride triggers cross-angle style coherence checks in the system prompt
-    const angleResult = await generateStylePreview(mockAngleState, frontStyleOverride, idx + 1);
+    const angleResult = await generateStylePreview(mockAngleState, frontStyleOverride, sessionSeed);
     styledFrames[idx] = angleResult;
     geminiCallsCount++;
     totalUploadedBytes += sourceFrame.length;
