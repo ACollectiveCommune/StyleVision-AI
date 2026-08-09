@@ -88,8 +88,8 @@ export const AI180Capture: React.FC<AI180CaptureProps> = ({ onCaptureComplete, o
 
       const ctx = canvas.getContext('2d');
       if (ctx) {
-        // Downscale camera feed resolution to 512px max dimension to respect Gemini token quotas
-        const maxDim = 512;
+        // Downscale camera feed resolution to 1024px max dimension for high quality and safe token quotas
+        const maxDim = 1024;
         let targetWidth = video.videoWidth;
         let targetHeight = video.videoHeight;
 
