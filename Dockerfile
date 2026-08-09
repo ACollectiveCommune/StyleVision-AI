@@ -1,12 +1,12 @@
-# Use official python slim image
-FROM python:3.9-slim
+# Use official python 3.11 slim image
+FROM python:3.11-slim
 
 # Set working directory
 WORKDIR /app
 
-# Install python packages (no system libraries required!)
+# Install and upgrade runpod, PIL, and other dependencies
+RUN pip install --no-cache-dir -U runpod
 RUN pip install --no-cache-dir \
-    runpod \
     numpy \
     requests \
     Pillow \
