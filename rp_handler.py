@@ -3,7 +3,7 @@ import requests
 import json
 import base64
 import numpy as np
-import cv2
+from PIL import Image
 import runpod
 
 # Initialize Firebase Admin if environment variables are provided
@@ -116,10 +116,10 @@ def generate_splat_cloud(images_data):
             for angle, w, u_coord in views:
                 if w > 0 and angle in images_data:
                     img = images_data[angle]
-                    h_img, w_img, _ = img.shape
+                    w_img, h_img = img.size
                     px = max(0, min(w_img - 1, int(u_coord * w_img)))
                     py = max(0, min(h_img - 1, int(v_coord * h_img)))
-                    b, g, r = img[py, px]
+                    r, g, b = img.getpixel((px, py))
                     r_sum += r * w
                     g_sum += g * w
                     b_sum += b * w
@@ -192,11 +192,12 @@ def handler(event):
             
         local_images[angle] = local_path
         
-        # Load via OpenCV for pixel sampling
-        img = cv2.imread(local_path)
-        if img is None:
-            return {"error": f"Corrupted file payload for {angle}"}
-        images_data[angle] = img
+        # Load via PIL for pixel sampling
+        try:
+            img = Image.open(local_path).convert("RGB")
+            images_data[angle] = img
+        except Exception as e:
+            return {"error": f"Corrupted file payload for {angle}: {e}"}
         
     # 2. Build camera pose verification dictionary
     poses = {}

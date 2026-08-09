@@ -1,22 +1,15 @@
-# Use official PyTorch image with GPU support if needed, or lightweight Python base
+# Use official python slim image
 FROM python:3.9-slim
-
-# Install system dependencies for OpenCV and image processing
-RUN apt-get update && apt-get install -y \
-    libgl1-mesa-glx \
-    libglib2.0-0 \
-    build-essential \
-    && rm -rf /var/lib/apt/lists/*
 
 # Set working directory
 WORKDIR /app
 
-# Install python packages
+# Install python packages (no system libraries required!)
 RUN pip install --no-cache-dir \
     runpod \
     numpy \
-    opencv-python-headless \
     requests \
+    Pillow \
     firebase-admin
 
 # Copy handler script into the container image
