@@ -239,8 +239,8 @@ export const AI180Viewer: React.FC<AI180ViewerProps> = ({
       setScans(prev => [newScan, ...prev]);
       setSelectedScan(newScan);
       
-      // Auto transition to customization
-      setViewState('customization');
+      // Directly start generation using the new scan instead of showing the customization panel
+      handleStartGeneration(newScan);
     } catch (err: any) {
       console.error(err);
       setErrorMsg(err.message || 'Failed to process capture');
@@ -248,8 +248,9 @@ export const AI180Viewer: React.FC<AI180ViewerProps> = ({
     }
   };
 
-  const handleStartGeneration = async () => {
-    if (!selectedScan) {
+  const handleStartGeneration = async (scanOverride?: AI180Scan) => {
+    const scan = scanOverride || selectedScan;
+    if (!scan) {
       alert('Please perform a scan first!');
       return;
     }
@@ -272,8 +273,8 @@ export const AI180Viewer: React.FC<AI180ViewerProps> = ({
       // Execute 9-view generation loop
       const results = await generateAI180Preview(
         uid,
-        selectedScan.id,
-        selectedScan.sourceFrames,
+        scan.id,
+        scan.sourceFrames,
         styleSnapshot,
         appState,
         (percent, msg) => {
@@ -295,11 +296,11 @@ export const AI180Viewer: React.FC<AI180ViewerProps> = ({
       // Save generated style preview metadata
       await saveAI180Style(uid, {
         userId: uid,
-        scanId: selectedScan.id,
-        hairstyleId: selectedHair,
-        hairColorId: selectedColor,
-        beardId: selectedBeard,
-        beardColorId: selectedBeardColor,
+        scanId: scan.id,
+        hairstyleId: styleSnapshot.hairstyleId,
+        hairColorId: styleSnapshot.hairColorId,
+        beardId: styleSnapshot.beardId,
+        beardColorId: styleSnapshot.beardColorId,
         generatedFrames: urls,
         createdAt: new Date().toISOString()
       });
@@ -452,7 +453,7 @@ export const AI180Viewer: React.FC<AI180ViewerProps> = ({
             {scans.length > 0 ? (
               <div className="flex flex-col gap-2 w-full mt-4">
                 <button
-                  onClick={() => setViewState('customization')}
+            onClick={() => handleStartGeneration()}
                   className="w-full py-3 rounded-full bg-indigo-600 hover:bg-indigo-500 text-xs font-black uppercase tracking-widest transition shadow-lg"
                 >
                   Reuse Previous Scan
@@ -479,7 +480,7 @@ export const AI180Viewer: React.FC<AI180ViewerProps> = ({
         {viewState === 'capture' && (
           <AI180Capture 
             onCaptureComplete={handleCaptureComplete}
-            onClose={() => setViewState(scans.length > 0 ? 'customization' : 'intro')}
+            onClose={() => setViewState('intro')}
           />
         )}
 
