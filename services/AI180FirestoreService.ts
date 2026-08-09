@@ -17,7 +17,7 @@ const compressLocalFrame = (base64: string): Promise<string> => {
     img.src = base64;
     img.onload = () => {
       const canvas = document.createElement('canvas');
-      const maxDim = 200; // Small size is perfect for local preview rotation
+      const maxDim = 480; // Sharp enough for fallback previews but safe for local storage limits
       let w = img.width;
       let h = img.height;
       if (w > maxDim || h > maxDim) {

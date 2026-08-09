@@ -146,6 +146,8 @@ const OutfitCard: React.FC<{
   );
 };
 
+(window as any).localScanFramesCache = {};
+
 const App: React.FC = () => {
   const billingUnsubscribeRef = useRef<(() => void) | null>(null);
   const webUnsubscribeRef = useRef<(() => void) | null>(null);
@@ -578,6 +580,12 @@ const App: React.FC = () => {
         createdAt: new Date().toISOString(),
         version: '1.0'
       });
+
+      // Cache original high-resolution frames in memory to bypass LocalStorage downscaling limits
+      if (!(window as any).localScanFramesCache) {
+        (window as any).localScanFramesCache = {};
+      }
+      (window as any).localScanFramesCache[scanId] = anchors;
 
       // 4. Transition straight to Editor mode with Front View baseline
       updateState({

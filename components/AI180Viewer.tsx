@@ -132,10 +132,13 @@ export const AI180Viewer: React.FC<AI180ViewerProps> = ({
               outfitId: appState.selectedOutfit?.id || 'original'
             };
 
+            const cachedFrames = (window as any).localScanFramesCache?.[scan.id];
+            const sourceFrames = cachedFrames && cachedFrames.length > 0 ? cachedFrames : scan.sourceFrames;
+
             const results = await generateAI180Preview(
               uid,
               scan.id,
-              scan.sourceFrames,
+              sourceFrames,
               styleSnapshot,
               appState,
               (percent, msg) => {
@@ -270,11 +273,14 @@ export const AI180Viewer: React.FC<AI180ViewerProps> = ({
     };
 
     try {
+      const cachedFrames = (window as any).localScanFramesCache?.[scan.id];
+      const sourceFrames = cachedFrames && cachedFrames.length > 0 ? cachedFrames : scan.sourceFrames;
+
       // Execute 9-view generation loop
       const results = await generateAI180Preview(
         uid,
         scan.id,
-        scan.sourceFrames,
+        sourceFrames,
         styleSnapshot,
         appState,
         (percent, msg) => {
