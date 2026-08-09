@@ -14,16 +14,16 @@ service cloud.firestore {
       match /favorited_styles/{documentId} {
         allow read, write, delete: if request.auth != null && request.auth.uid == userId;
       }
+    }
 
-      // AI 180 Scans subcollection
-      match /ai180_scans/{documentId} {
-        allow read, write, delete: if request.auth != null && request.auth.uid == userId;
-      }
+    // AI 180 Scans subcollection (flattened)
+    match /users/{userId}/ai180_scans/{documentId} {
+      allow read, write, delete: if request.auth != null && request.auth.uid == userId;
+    }
 
-      // AI 180 Styles subcollection
-      match /ai180_styles/{documentId} {
-        allow read, write, delete: if request.auth != null && request.auth.uid == userId;
-      }
+    // AI 180 Styles subcollection (flattened)
+    match /users/{userId}/ai180_styles/{documentId} {
+      allow read, write, delete: if request.auth != null && request.auth.uid == userId;
     }
     
     // Rules for 360 viewer credits and ledgers
