@@ -27,7 +27,8 @@ import {
   FavoritedStyle,
   toggleFavorite,
   fetchUserFavorites,
-  deleteGeneration
+  deleteGeneration,
+  isFirebaseEnabled
 } from './services/firebase';
 import { subscribeToCredits, incrementUserCredits, consumeCredit } from './services/billingService';
 import { getUser360Wallet } from './services/threeSixtyService';
@@ -384,25 +385,27 @@ const App: React.FC = () => {
           }
         } catch (err) {
           console.error("Error setting up user billing data:", err);
+          const isLocalMode = localStorage.getItem('stylevision_force_local') === 'true' || !isFirebaseEnabled;
           updateState({
-            isPremium: false,
+            isPremium: isLocalMode,
             premiumChecked: true,
             generationCount: 0,
             credits: 999,
-            isSubscriber: false,
-            subscriptionPlan: null,
-            available360Credits: 0
+            isSubscriber: isLocalMode,
+            subscriptionPlan: isLocalMode ? "premium" : null,
+            available360Credits: 999
           });
         }
       } else {
+        const isLocalMode = localStorage.getItem('stylevision_force_local') === 'true' || !isFirebaseEnabled;
         updateState({
-          isPremium: false,
+          isPremium: isLocalMode,
           premiumChecked: true,
           generationCount: 0,
           credits: 999,
-          isSubscriber: false,
-          subscriptionPlan: null,
-          available360Credits: 0,
+          isSubscriber: isLocalMode,
+          subscriptionPlan: isLocalMode ? "premium" : null,
+          available360Credits: 999,
           active360PreviewId: null
         });
         setShowOnboardingPaywall(false);
