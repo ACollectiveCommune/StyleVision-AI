@@ -26,15 +26,24 @@ export const AI180Capture: React.FC<AI180CaptureProps> = ({ onCaptureComplete, o
       if (streamRef.current) {
         streamRef.current.getTracks().forEach(t => t.stop());
       }
-      const constraints = {
-        video: {
-          facingMode,
-          width: { ideal: 1080 },
-          height: { ideal: 1920 }
-        },
-        audio: false
-      };
-      const stream = await navigator.mediaDevices.getUserMedia(constraints);
+      let stream: MediaStream | null = null;
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: {
+            facingMode,
+            width: { ideal: 1920 },
+            height: { ideal: 1080 }
+          },
+          audio: false
+        });
+      } catch (err) {
+        console.warn("AI180Capture: Failed high quality stream, falling back to standard resolution:", err);
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode },
+          audio: false
+        });
+      }
+
       streamRef.current = stream;
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
