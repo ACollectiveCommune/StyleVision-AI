@@ -214,7 +214,15 @@ def handler(event):
     output_ply_path = f"/tmp/reconstruction_{job_id}.ply"
     write_ply(points, output_ply_path)
     
-    # 5. Upload to Firebase Storage if active
+    # Read raw PLY text to return directly in the response JSON
+    ply_text = ""
+    try:
+        with open(output_ply_path, "r") as f:
+            ply_text = f.read()
+    except Exception as e:
+        print(f"Failed to read local PLY file: {e}")
+
+    # 5. Upload to Firebase Storage if active (optional backup)
     public_url = ""
     try:
         bucket = storage.bucket()
@@ -224,8 +232,7 @@ def handler(event):
         blob.make_public()
         public_url = blob.public_url
     except Exception as e:
-        print(f"Firebase storage upload failed: {e}")
-        # Return fallback mock URL/Base64 or error
+        print(f"Firebase storage upload skipped: {e}")
         public_url = f"https://firebasestorage.googleapis.com/v0/b/stylevisionai-20632.appspot.com/o/reconstructions%2F{job_id}.ply?alt=media"
 
     # Clean up tmp files
@@ -238,11 +245,12 @@ def handler(event):
     return {
         "status": "success",
         "jobId": job_id,
+        "plyData": ply_text,
         "modelUrl": public_url,
         "pointCount": len(points),
         "cameraPoses": poses,
         "fileType": "ply",
-        "fileSizeBytes": len(points) * 60 
+        "fileSizeBytes": len(ply_text)
     }
 
 if __name__ == "__main__":
