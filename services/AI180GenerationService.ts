@@ -27,7 +27,13 @@ export const generateAI180Preview = async (
   appState: AppState,
   onProgress: (percent: number, msg: string) => void
 ): Promise<string[]> => {
-  const cacheKey = `${scanId}_h:${style.hairstyleId}_c:${style.hairColorId}_b:${style.beardId}_bc:${style.beardColorId}_o:${style.outfitId}_m:${style.makeup}`;
+  const aestheticsHash = Object.entries(style.aesthetics || {})
+    .filter(([_, val]) => val > 0)
+    .sort((a, b) => a[0].localeCompare(b[0]))
+    .map(([id, val]) => `${id}:${val}`)
+    .join(',');
+  const eyeColor = style.eyeColorId || 'eyecolor_original';
+  const cacheKey = `${scanId}_h:${style.hairstyleId}_c:${style.hairColorId}_b:${style.beardId}_bc:${style.beardColorId}_o:${style.outfitId}_m:${style.makeup}_ae:${aestheticsHash}_eye:${eyeColor}`;
   
   if (generationCache[cacheKey]) {
     console.log('[AI180GenService] Cache hit! Returning cached styled frames.', cacheKey);

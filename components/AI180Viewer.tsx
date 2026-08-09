@@ -128,9 +128,10 @@ export const AI180Viewer: React.FC<AI180ViewerProps> = ({
               hairColorId: appState.selectedHairColor?.id || 'natural',
               beardId: appState.selectedBeardStyle?.id || 'beard_none',
               beardColorId: appState.selectedBeardColor?.id || 'natural',
-              aesthetics: {},
-              makeup: 'makeup_none',
-              outfitId: appState.selectedOutfit?.id || 'original'
+              aesthetics: appState.aestheticsState || {},
+              makeup: appState.selectedMakeup?.id || 'makeup_none',
+              outfitId: appState.selectedOutfit?.id || 'original',
+              eyeColorId: appState.selectedEyeColor?.id || 'eyecolor_original'
             };
 
             const cachedFrames = (window as any).localScanFramesCache?.[scan.id];
@@ -268,9 +269,10 @@ export const AI180Viewer: React.FC<AI180ViewerProps> = ({
       hairColorId: appState.selectedHairColor?.id || selectedColor,
       beardId: appState.selectedBeardStyle?.id || selectedBeard,
       beardColorId: appState.selectedBeardColor?.id || selectedBeardColor,
-      aesthetics: {},
-      makeup: 'makeup_none',
-      outfitId: appState.selectedOutfit?.id || selectedOutfit
+      aesthetics: appState.aestheticsState || {},
+      makeup: appState.selectedMakeup?.id || 'makeup_none',
+      outfitId: appState.selectedOutfit?.id || selectedOutfit,
+      eyeColorId: appState.selectedEyeColor?.id || 'eyecolor_original'
     };
 
     try {
