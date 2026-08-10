@@ -792,6 +792,51 @@ export const AI180Viewer: React.FC<AI180ViewerProps> = ({
             onTouchStart={handleTouchStart}
             onTouchMove={handleTouchMove}
           >
+            <style>{`
+              @keyframes border-rotate {
+                100% {
+                  transform: rotate(360deg);
+                }
+              }
+              .rgb-pill-container {
+                position: relative;
+                border-radius: 9999px;
+                padding: 1px; /* border thickness */
+                overflow: hidden;
+                display: inline-flex;
+                align-items: center;
+                justify-content: center;
+              }
+              .rgb-pill-bg {
+                position: absolute;
+                top: -50%;
+                left: -50%;
+                width: 200%;
+                height: 200%;
+                background: conic-gradient(
+                  from 0deg,
+                  #fbbf24 0%,
+                  #d97706 25%,
+                  #8b5cf6 50%,
+                  #ec4899 75%,
+                  #fbbf24 100%
+                );
+                animation: border-rotate 4s linear infinite;
+                z-index: 0;
+              }
+              .rgb-pill-content {
+                position: relative;
+                z-index: 1;
+                background-color: rgba(9, 9, 11, 0.85); /* Dark translucent background */
+                border-radius: 9999px;
+                height: 100%;
+                width: 100%;
+                display: flex;
+                align-items: center;
+                gap: 6px;
+              }
+            `}</style>
+
             {/* Full-Screen Immersive Render Image Frame Container */}
             <div className="absolute inset-0 z-10 overflow-hidden flex items-center justify-center pointer-events-none select-none">
               {/* Background: Blurred letterboxing fallback */}
@@ -809,7 +854,7 @@ export const AI180Viewer: React.FC<AI180ViewerProps> = ({
             </div>
 
             {/* Floating Top Bar overlay */}
-            <div className="absolute top-0 left-0 right-0 z-20 p-4 pt-[calc(env(safe-area-inset-top,20px)+12px)] flex justify-between items-center pointer-events-none">
+            <div className="absolute top-0 left-0 right-0 z-20 p-4 pt-[calc(env(safe-area-inset-top,20px)+24px)] flex justify-between items-center pointer-events-none">
               
               {/* Left: Back button */}
               <div className="pointer-events-auto">
@@ -824,14 +869,19 @@ export const AI180Viewer: React.FC<AI180ViewerProps> = ({
                 </button>
               </div>
 
-              {/* Center: Title Pill */}
-              <div className="flex items-center gap-1.5 px-4 h-10 rounded-full bg-black/40 backdrop-blur-xl border border-white/10 shadow-lg pointer-events-none">
-                <span className="text-[10px] font-black uppercase tracking-widest text-white whitespace-nowrap">
-                  AI 180° Preview
-                </span>
-                <span className="text-[8px] bg-amber-400 text-neutral-950 font-extrabold px-1.5 py-0.5 rounded leading-none">
-                  EXP
-                </span>
+              {/* Center: Title Pill with RGB Outline Animation */}
+              <div className="pointer-events-none">
+                <div className="rgb-pill-container h-10 px-[1px] py-[1px] shadow-lg">
+                  <div className="rgb-pill-bg" />
+                  <div className="rgb-pill-content px-4">
+                    <span className="text-[10px] font-black uppercase tracking-widest text-amber-400 whitespace-nowrap">
+                      AI 180° PREVIEW
+                    </span>
+                    <span className="text-[8px] bg-amber-400 text-neutral-950 font-extrabold px-1.5 py-0.5 rounded leading-none">
+                      EXP
+                    </span>
+                  </div>
+                </div>
               </div>
 
               {/* Right: Heart & Download Grouping */}
@@ -867,18 +917,18 @@ export const AI180Viewer: React.FC<AI180ViewerProps> = ({
 
             </div>
 
-            {/* Floating Bottom Info & CTA */}
-            <div className="absolute bottom-0 left-0 right-0 z-20 p-6 pb-[calc(1.5rem+env(safe-area-inset-bottom,0px))] flex flex-col items-center gap-4 pointer-events-none">
+            {/* Floating Bottom Glass Bar Container */}
+            <div className="absolute bottom-0 left-0 right-0 z-20 bg-black/40 backdrop-blur-xl border-t border-white/10 shadow-[0_-8px_32px_rgba(0,0,0,0.5)] pt-6 pb-[calc(1.5rem+env(safe-area-inset-bottom,0px))] px-6 flex flex-col items-center gap-4 pointer-events-auto">
               
-              {/* Drag instruction overlay */}
-              <div className={`px-4 py-2 rounded-full bg-black/45 backdrop-blur-md border border-white/5 shadow-lg text-white/70 text-[10px] font-bold tracking-wider transition-opacity duration-500 pointer-events-none ${
+              {/* Drag instruction overlay (absolute positioned just above the glass bar) */}
+              <div className={`absolute -top-12 left-1/2 transform -translate-x-1/2 px-4 py-2 rounded-full bg-black/50 backdrop-blur-md border border-white/10 shadow-lg text-white/70 text-[10px] font-bold tracking-wider transition-opacity duration-500 pointer-events-none ${
                 hasSwiped ? 'opacity-0' : 'opacity-100'
               }`}>
                 ↔ Swipe to rotate
               </div>
 
-              {/* Back to Editor CTA */}
-              <div className="w-full max-w-[280px] pointer-events-auto">
+              {/* Back to Editor CTA Button */}
+              <div className="w-full max-w-[280px]">
                 <button
                   onClick={onClose}
                   className="w-full py-3 rounded-full bg-white/10 hover:bg-white/15 backdrop-blur-xl border border-white/10 text-[11px] font-extrabold uppercase tracking-widest text-white/80 hover:text-white shadow-lg transition-all active:scale-[0.97]"
