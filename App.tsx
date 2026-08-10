@@ -1673,7 +1673,7 @@ const App: React.FC = () => {
           uid={currentUser.uid}
           appState={state}
           onUpdateState={updateState}
-          onClose={() => updateState({ showAI180Viewer: false, activeAI180ScanId: null })}
+          onClose={() => updateState({ showAI180Viewer: false })}
           onOpenOriginal180={() => updateState({ show360Viewer: true })}
         />
       )}

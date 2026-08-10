@@ -1203,6 +1203,7 @@ export const PhotoEditor: React.FC<PhotoEditorProps> = ({
                 selectedTreatments: [],
                 customPrompt: '',
                 captured180Frames: undefined,
+                activeAI180ScanId: null,
                 editorMode: "single_photo"
               });
             }
