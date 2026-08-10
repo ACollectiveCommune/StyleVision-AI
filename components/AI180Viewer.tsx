@@ -169,12 +169,21 @@ export const AI180Viewer: React.FC<AI180ViewerProps> = ({
             setGenProgress(0);
             setGenMessage('Initializing Try-on Generator...');
 
+            const aestheticsMap: Record<string, number> = {};
+            if (appState.selectedTreatments) {
+              appState.selectedTreatments.forEach(t => {
+                if (t.value > 0) {
+                  aestheticsMap[t.treatmentId] = t.value * 20;
+                }
+              });
+            }
+
             const styleSnapshot = {
               hairstyleId: appState.selectedHairStyle?.id || 'original',
               hairColorId: appState.selectedHairColor?.id || 'natural',
               beardId: appState.selectedBeardStyle?.id || 'beard_none',
               beardColorId: appState.selectedBeardColor?.id || 'natural',
-              aesthetics: appState.aestheticsState || {},
+              aesthetics: aestheticsMap,
               makeup: appState.selectedMakeup?.id || 'makeup_none',
               outfitId: appState.selectedOutfit?.id || 'original',
               eyeColorId: appState.selectedEyeColor?.id || 'eyecolor_original'
@@ -345,12 +354,21 @@ export const AI180Viewer: React.FC<AI180ViewerProps> = ({
       return;
     }
 
+    const aestheticsMap: Record<string, number> = {};
+    if (appState.selectedTreatments) {
+      appState.selectedTreatments.forEach(t => {
+        if (t.value > 0) {
+          aestheticsMap[t.treatmentId] = t.value * 20;
+        }
+      });
+    }
+
     const styleSnapshot = {
       hairstyleId: appState.selectedHairStyle?.id || selectedHair,
       hairColorId: appState.selectedHairColor?.id || selectedColor,
       beardId: appState.selectedBeardStyle?.id || selectedBeard,
       beardColorId: appState.selectedBeardColor?.id || selectedBeardColor,
-      aesthetics: appState.aestheticsState || {},
+      aesthetics: aestheticsMap,
       makeup: appState.selectedMakeup?.id || 'makeup_none',
       outfitId: appState.selectedOutfit?.id || selectedOutfit,
       eyeColorId: appState.selectedEyeColor?.id || 'eyecolor_original'
