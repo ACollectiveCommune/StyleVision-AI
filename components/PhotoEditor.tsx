@@ -1169,6 +1169,20 @@ export const PhotoEditor: React.FC<PhotoEditorProps> = ({
 
       {/* 2. Floating Action Controls (Top Right) */}
       <div className="absolute top-24 right-4 flex flex-col gap-3 z-30 pointer-events-auto">
+        {/* View AI 180° Preview Button */}
+        {isAI180Mode && (
+          <button 
+            type="button"
+            onClick={() => onUpdateState({ showAI180Viewer: true })}
+            className="w-10 h-10 rounded-full bg-indigo-600 backdrop-blur-xl flex items-center justify-center text-white border border-indigo-500/40 active:scale-90 transition-transform shadow-lg shadow-indigo-600/20"
+            title="View AI 180° Rotatable Preview"
+          >
+            <svg width={18} height={18} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5} className="text-amber-300">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 1121.21 15.07M21 8v1h-1a8.001 8.001 0 00-6.19-2.07" />
+            </svg>
+          </button>
+        )}
+
         {/* Change Photo Button */}
         <button 
           type="button"

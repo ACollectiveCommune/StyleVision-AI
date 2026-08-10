@@ -16,7 +16,7 @@ import {
 } from '../constants';
 import { AI180Capture } from './AI180Capture';
 import { extractAnchorFrames } from '../services/AI180ViewProcessor';
-import { generateAI180Preview } from '../services/AI180GenerationService';
+import { generateAI180Preview, getCachedAI180Preview, generationCache } from '../services/AI180GenerationService';
 import { 
   saveAI180Scan, 
   getAI180Scans, 
@@ -34,6 +34,52 @@ interface AI180ViewerProps {
   onClose: () => void;
   onOpenOriginal180: () => void;
 }
+
+const findMatchingSavedStyle = (
+  savedStyles: AI180GeneratedStyle[],
+  target: {
+    hairstyleId: string;
+    hairColorId: string;
+    beardId: string;
+    beardColorId: string;
+    outfitId: string;
+    makeup: string;
+    aesthetics: Record<string, number>;
+    eyeColorId?: string;
+  }
+): AI180GeneratedStyle | null => {
+  for (const style of savedStyles) {
+    if (
+      style.hairstyleId === target.hairstyleId &&
+      style.hairColorId === target.hairColorId &&
+      style.beardId === target.beardId &&
+      style.beardColorId === target.beardColorId &&
+      style.outfitId === target.outfitId &&
+      style.makeup === target.makeup &&
+      (style.eyeColorId || 'eyecolor_original') === (target.eyeColorId || 'eyecolor_original')
+    ) {
+      // Compare aesthetics
+      const styleAes = style.aesthetics || {};
+      const targetAes = target.aesthetics || {};
+      
+      const allKeys = new Set([...Object.keys(styleAes), ...Object.keys(targetAes)]);
+      let aesMatches = true;
+      for (const k of allKeys) {
+        const val1 = styleAes[k] || 0;
+        const val2 = targetAes[k] || 0;
+        if (val1 !== val2) {
+          aesMatches = false;
+          break;
+        }
+      }
+      
+      if (aesMatches) {
+        return style;
+      }
+    }
+  }
+  return null;
+};
 
 export const AI180Viewer: React.FC<AI180ViewerProps> = ({
   uid,
@@ -134,6 +180,45 @@ export const AI180Viewer: React.FC<AI180ViewerProps> = ({
               eyeColorId: appState.selectedEyeColor?.id || 'eyecolor_original'
             };
 
+            // 1. Check in-memory cache first for instant transition
+            const cachedStyled = getCachedAI180Preview(scan.id, styleSnapshot);
+            if (cachedStyled && cachedStyled.length > 0) {
+              setStyledFrames(cachedStyled);
+              setActiveFrameIdx(4);
+              setViewState('viewer');
+              return;
+            }
+
+            // 2. Query Firestore/LocalStorage styles next
+            setViewState('generating');
+            setGenProgress(20);
+            setGenMessage('Checking for saved styles...');
+            const savedStyles = await getAI180StylesForScan(uid, scan.id);
+            const matchingStyle = findMatchingSavedStyle(savedStyles, styleSnapshot);
+            if (matchingStyle && matchingStyle.generatedFrames && matchingStyle.generatedFrames.length > 0) {
+              setGenProgress(60);
+              setGenMessage('Retrieving previously generated look...');
+              await preloadImages(matchingStyle.generatedFrames);
+
+              // Seed cache
+              const aestheticsHash = Object.entries(styleSnapshot.aesthetics || {})
+                .filter(([_, val]) => val > 0)
+                .sort((a, b) => a[0].localeCompare(b[0]))
+                .map(([id, val]) => `${id}:${val}`)
+                .join(',');
+              const eyeColor = styleSnapshot.eyeColorId || 'eyecolor_original';
+              const cacheKey = `${scan.id}_h:${styleSnapshot.hairstyleId}_c:${styleSnapshot.hairColorId}_b:${styleSnapshot.beardId}_bc:${styleSnapshot.beardColorId}_o:${styleSnapshot.outfitId}_m:${styleSnapshot.makeup}_ae:${aestheticsHash}_eye:${eyeColor}`;
+              generationCache[cacheKey] = matchingStyle.generatedFrames;
+
+              setStyledFrames(matchingStyle.generatedFrames);
+              setActiveFrameIdx(4);
+              setViewState('viewer');
+              return;
+            }
+
+            setGenProgress(30);
+            setGenMessage('Initializing Try-on Generator...');
+
             const cachedFrames = (window as any).localScanFramesCache?.[scan.id];
             const sourceFrames = cachedFrames && cachedFrames.length > 0 ? cachedFrames : scan.sourceFrames;
 
@@ -144,7 +229,7 @@ export const AI180Viewer: React.FC<AI180ViewerProps> = ({
               styleSnapshot,
               appState,
               (percent, msg) => {
-                setGenProgress(percent);
+                setGenProgress(30 + Math.floor(percent * 0.5));
                 setGenMessage(msg);
               }
             );
@@ -260,10 +345,6 @@ export const AI180Viewer: React.FC<AI180ViewerProps> = ({
       return;
     }
 
-    setViewState('generating');
-    setGenProgress(0);
-    setGenMessage('Initializing try-on generator...');
-
     const styleSnapshot = {
       hairstyleId: appState.selectedHairStyle?.id || selectedHair,
       hairColorId: appState.selectedHairColor?.id || selectedColor,
@@ -275,7 +356,47 @@ export const AI180Viewer: React.FC<AI180ViewerProps> = ({
       eyeColorId: appState.selectedEyeColor?.id || 'eyecolor_original'
     };
 
+    // 1. Check in-memory cache first for instant transition
+    const cachedStyled = getCachedAI180Preview(scan.id, styleSnapshot);
+    if (cachedStyled && cachedStyled.length > 0) {
+      setStyledFrames(cachedStyled);
+      setActiveFrameIdx(4);
+      setViewState('viewer');
+      return;
+    }
+
+    setViewState('generating');
+    setGenProgress(20);
+    setGenMessage('Checking for saved styles...');
+
     try {
+      // 2. Query Firestore/LocalStorage styles next
+      const savedStyles = await getAI180StylesForScan(uid, scan.id);
+      const matchingStyle = findMatchingSavedStyle(savedStyles, styleSnapshot);
+      if (matchingStyle && matchingStyle.generatedFrames && matchingStyle.generatedFrames.length > 0) {
+        setGenProgress(60);
+        setGenMessage('Retrieving previously generated look...');
+        await preloadImages(matchingStyle.generatedFrames);
+
+        // Seed cache
+        const aestheticsHash = Object.entries(styleSnapshot.aesthetics || {})
+          .filter(([_, val]) => val > 0)
+          .sort((a, b) => a[0].localeCompare(b[0]))
+          .map(([id, val]) => `${id}:${val}`)
+          .join(',');
+        const eyeColor = styleSnapshot.eyeColorId || 'eyecolor_original';
+        const cacheKey = `${scan.id}_h:${styleSnapshot.hairstyleId}_c:${styleSnapshot.hairColorId}_b:${styleSnapshot.beardId}_bc:${styleSnapshot.beardColorId}_o:${styleSnapshot.outfitId}_m:${styleSnapshot.makeup}_ae:${aestheticsHash}_eye:${eyeColor}`;
+        generationCache[cacheKey] = matchingStyle.generatedFrames;
+
+        setStyledFrames(matchingStyle.generatedFrames);
+        setActiveFrameIdx(4);
+        setViewState('viewer');
+        return;
+      }
+
+      setGenProgress(35);
+      setGenMessage('Initializing try-on generator...');
+
       const cachedFrames = (window as any).localScanFramesCache?.[scan.id];
       const sourceFrames = cachedFrames && cachedFrames.length > 0 ? cachedFrames : scan.sourceFrames;
 

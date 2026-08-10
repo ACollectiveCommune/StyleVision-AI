@@ -13,7 +13,21 @@ interface StyleSnapshot {
 }
 
 // Memory cache to prevent redundant Gemini API calls
-const generationCache: Record<string, string[]> = {};
+export const generationCache: Record<string, string[]> = {};
+
+export const getCachedAI180Preview = (
+  scanId: string,
+  style: StyleSnapshot
+): string[] | null => {
+  const aestheticsHash = Object.entries(style.aesthetics || {})
+    .filter(([_, val]) => val > 0)
+    .sort((a, b) => a[0].localeCompare(b[0]))
+    .map(([id, val]) => `${id}:${val}`)
+    .join(',');
+  const eyeColor = style.eyeColorId || 'eyecolor_original';
+  const cacheKey = `${scanId}_h:${style.hairstyleId}_c:${style.hairColorId}_b:${style.beardId}_bc:${style.beardColorId}_o:${style.outfitId}_m:${style.makeup}_ae:${aestheticsHash}_eye:${eyeColor}`;
+  return generationCache[cacheKey] || null;
+};
 
 /**
  * Handles multi-view styling generation for the 9 anchor views.
