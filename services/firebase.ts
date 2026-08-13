@@ -28,6 +28,7 @@ import {
 import { getStorage, ref, uploadString, getDownloadURL } from "firebase/storage";
 import { Capacitor } from "@capacitor/core";
 import { FirebaseAuthentication } from "@capacitor-firebase/authentication";
+import { SavedGeneration, FavoritedStyle } from "../types";
 
 // Firebase configuration using environment variables
 const firebaseConfig = {
@@ -268,35 +269,105 @@ export const uploadImageToStorage = async (
   }
 };
 
-// LocalStorage helpers for local mode
-const getLocalHistory = (): any[] => {
-  try {
-    return JSON.parse(localStorage.getItem('stylevision_history') || '[]');
-  } catch {
-    return [];
+// IndexedDB Local Database helper for guest users / offline persistence
+class LocalDB {
+  private static dbName = 'StyleVisionDB';
+  private static storeName = 'history';
+  private static version = 1;
+
+  private static getDB(): Promise<IDBDatabase> {
+    return new Promise((resolve, reject) => {
+      try {
+        const request = indexedDB.open(this.dbName, this.version);
+        request.onupgradeneeded = () => {
+          const db = request.result;
+          if (!db.objectStoreNames.contains(this.storeName)) {
+            db.createObjectStore(this.storeName, { keyPath: 'id' });
+          }
+        };
+        request.onsuccess = () => resolve(request.result);
+        request.onerror = () => reject(request.error);
+      } catch (e) {
+        reject(e);
+      }
+    });
   }
-};
 
-const saveLocalHistory = (history: any[]) => {
-  localStorage.setItem('stylevision_history', JSON.stringify(history));
-};
+  static async getAll(): Promise<any[]> {
+    try {
+      const db = await this.getDB();
+      return new Promise((resolve, reject) => {
+        const transaction = db.transaction(this.storeName, 'readonly');
+        const store = transaction.objectStore(this.storeName);
+        const request = store.getAll();
+        request.onsuccess = () => {
+          const sorted = request.result.sort((a: any, b: any) => {
+            const tA = a.timestamp ? new Date(a.timestamp).getTime() : 0;
+            const tB = b.timestamp ? new Date(b.timestamp).getTime() : 0;
+            return tB - tA;
+          });
+          resolve(sorted);
+        };
+        request.onerror = () => reject(request.error);
+      });
+    } catch (e) {
+      console.warn("[LocalDB] IndexedDB error, falling back to LocalStorage:", e);
+      try {
+        return JSON.parse(localStorage.getItem('stylevision_history') || '[]');
+      } catch {
+        return [];
+      }
+    }
+  }
 
-export interface SavedGeneration {
-  id?: string;
-  originalImageUrl: string;
-  generatedImageUrl: string;
-  hairStyle: string;
-  hairColor: string;
-  beardStyle: string;
-  beardColor: string;
-  outfit?: string;
-  makeup?: string;
-  eyeColor?: string;
-  treatments?: Array<{ treatmentId: string; value: number; label: string }>;
-  customPrompt?: string;
-  gender: string;
-  timestamp?: any;
-  isFavorite: boolean;
+  static async put(item: any): Promise<void> {
+    try {
+      const db = await this.getDB();
+      return new Promise<void>((resolve, reject) => {
+        const transaction = db.transaction(this.storeName, 'readwrite');
+        const store = transaction.objectStore(this.storeName);
+        const request = store.put(item);
+        request.onsuccess = () => resolve();
+        request.onerror = () => reject(request.error);
+      });
+    } catch (e) {
+      console.warn("[LocalDB] IndexedDB error, falling back to LocalStorage:", e);
+      try {
+        const history = JSON.parse(localStorage.getItem('stylevision_history') || '[]');
+        const existingIdx = history.findIndex((h: any) => h.id === item.id);
+        if (existingIdx > -1) {
+          history[existingIdx] = item;
+        } else {
+          history.unshift(item);
+        }
+        localStorage.setItem('stylevision_history', JSON.stringify(history));
+      } catch (storageErr) {
+        console.error("[LocalDB] LocalStorage backup write failed:", storageErr);
+      }
+    }
+  }
+
+  static async delete(id: string): Promise<void> {
+    try {
+      const db = await this.getDB();
+      return new Promise<void>((resolve, reject) => {
+        const transaction = db.transaction(this.storeName, 'readwrite');
+        const store = transaction.objectStore(this.storeName);
+        const request = store.delete(id);
+        request.onsuccess = () => resolve();
+        request.onerror = () => reject(request.error);
+      });
+    } catch (e) {
+      console.warn("[LocalDB] IndexedDB error, falling back to LocalStorage:", e);
+      try {
+        let history = JSON.parse(localStorage.getItem('stylevision_history') || '[]');
+        history = history.filter((h: any) => h.id !== id);
+        localStorage.setItem('stylevision_history', JSON.stringify(history));
+      } catch (storageErr) {
+        console.error("[LocalDB] LocalStorage backup delete failed:", storageErr);
+      }
+    }
+  }
 }
 
 // Database Helpers
@@ -304,24 +375,37 @@ export const saveGeneration = async (
   uid: string, 
   generation: Omit<SavedGeneration, 'id' | 'timestamp'>
 ): Promise<string> => {
+  console.log(`[firebaseService] saveGeneration initiated. uid: "${uid}", path: "users/${uid}/history"`);
   if (isFirebaseEnabled && uid !== "guest_user_local") {
-    const historyRef = collection(db, 'users', uid, 'history');
-    const docRef = await addDoc(historyRef, {
-      ...generation,
-      timestamp: serverTimestamp()
-    });
-    return docRef.id;
+    try {
+      const historyRef = collection(db, 'users', uid, 'history');
+      const payload = {
+        ...generation,
+        timestamp: serverTimestamp()
+      };
+      console.log("[firebaseService] Firestore payload prepared:", JSON.stringify(payload, (k, v) => v === undefined ? null : v));
+      const docRef = await addDoc(historyRef, payload);
+      console.log(`[firebaseService] Firestore write successful! docId: "${docRef.id}"`);
+      return docRef.id;
+    } catch (err: any) {
+      console.error(`[firebaseService] Firestore saveGeneration failed! Path: "users/${uid}/history". Error details:`, err);
+      throw err;
+    }
   } else {
-    const id = `local_gen_${Date.now()}`;
-    const newGen: SavedGeneration = {
-      ...generation,
-      id,
-      timestamp: new Date().toISOString()
-    };
-    const history = getLocalHistory();
-    history.unshift(newGen);
-    saveLocalHistory(history);
-    return id;
+    try {
+      const id = `local_gen_${Date.now()}`;
+      const newGen: SavedGeneration = {
+        ...generation,
+        id,
+        timestamp: new Date().toISOString()
+      };
+      console.log(`[firebaseService] LocalDB saveGeneration. Generated id: "${id}"`);
+      await LocalDB.put(newGen);
+      return id;
+    } catch (err: any) {
+      console.error("[firebaseService] LocalDB saveGeneration failed:", err);
+      throw err;
+    }
   }
 };
 
@@ -330,15 +414,30 @@ export const toggleFavorite = async (
   docId: string, 
   isFavorite: boolean
 ): Promise<void> => {
+  console.log(`[firebaseService] toggleFavorite initiated. uid: "${uid}", docId: "${docId}", isFavorite: ${isFavorite}`);
   if (isFirebaseEnabled && uid !== "guest_user_local") {
-    const docRef = doc(db, 'users', uid, 'history', docId);
-    await updateDoc(docRef, { isFavorite });
+    try {
+      const docRef = doc(db, 'users', uid, 'history', docId);
+      await updateDoc(docRef, { isFavorite });
+      console.log(`[firebaseService] Firestore toggleFavorite successful!`);
+    } catch (err: any) {
+      console.error(`[firebaseService] Firestore toggleFavorite failed! Path: "users/${uid}/history/${docId}". Error details:`, err);
+      throw err;
+    }
   } else {
-    const history = getLocalHistory();
-    const item = history.find(i => i.id === docId);
-    if (item) {
-      item.isFavorite = isFavorite;
-      saveLocalHistory(history);
+    try {
+      const history = await LocalDB.getAll();
+      const item = history.find(i => i.id === docId);
+      if (item) {
+        item.isFavorite = isFavorite;
+        await LocalDB.put(item);
+        console.log(`[firebaseService] LocalDB toggleFavorite successful!`);
+      } else {
+        console.warn(`[firebaseService] LocalDB toggleFavorite item not found: "${docId}"`);
+      }
+    } catch (err: any) {
+      console.error("[firebaseService] LocalDB toggleFavorite failed:", err);
+      throw err;
     }
   }
 };
@@ -351,73 +450,106 @@ export const deleteGeneration = async (
     const docRef = doc(db, 'users', uid, 'history', docId);
     await deleteDoc(docRef);
   } else {
-    let history = getLocalHistory();
-    history = history.filter(i => i.id !== docId);
-    saveLocalHistory(history);
+    try {
+      await LocalDB.delete(docId);
+      console.log(`[firebaseService] LocalDB deleteGeneration successful!`);
+    } catch (err: any) {
+      console.error("[firebaseService] LocalDB deleteGeneration failed:", err);
+      throw err;
+    }
   }
 };
 
 export const fetchUserHistory = async (uid: string): Promise<SavedGeneration[]> => {
+  console.log(`[firebaseService] fetchUserHistory query started. uid: "${uid}"`);
   if (isFirebaseEnabled && uid !== "guest_user_local") {
-    const historyRef = collection(db, 'users', uid, 'history');
-    const q = query(historyRef, orderBy('timestamp', 'desc'), limit(50));
-    const querySnapshot = await getDocs(q);
-    const results: SavedGeneration[] = [];
-    querySnapshot.forEach((doc) => {
-      const data = doc.data();
-      results.push({
-        id: doc.id,
-        originalImageUrl: data.originalImageUrl,
-        generatedImageUrl: data.generatedImageUrl,
-        hairStyle: data.hairStyle,
-        hairColor: data.hairColor,
-        beardStyle: data.beardStyle,
-        beardColor: data.beardColor,
-        gender: data.gender,
-        timestamp: data.timestamp,
-        isFavorite: !!data.isFavorite
+    try {
+      const historyRef = collection(db, 'users', uid, 'history');
+      const q = query(historyRef, orderBy('timestamp', 'desc'), limit(50));
+      const querySnapshot = await getDocs(q);
+      const results: SavedGeneration[] = [];
+      querySnapshot.forEach((doc) => {
+        const data = doc.data();
+        results.push({
+          id: doc.id,
+          originalImageUrl: data.originalImageUrl,
+          generatedImageUrl: data.generatedImageUrl,
+          hairStyle: data.hairStyle,
+          hairColor: data.hairColor,
+          beardStyle: data.beardStyle,
+          beardColor: data.beardColor,
+          outfit: data.outfit,
+          makeup: data.makeup,
+          eyeColor: data.eyeColor,
+          treatments: data.treatments,
+          customPrompt: data.customPrompt,
+          gender: data.gender,
+          timestamp: data.timestamp,
+          isFavorite: !!data.isFavorite,
+          type: data.type || "single-photo",
+          sessionId: data.sessionId || null,
+          frontImage: data.frontImage || null,
+          frames: data.frames || null,
+          angleMetadata: data.angleMetadata || null,
+          appliedParameters: data.appliedParameters || null
+        });
       });
-    });
-    return results;
+      console.log(`[firebaseService] fetchUserHistory loaded ${results.length} items.`);
+      return results;
+    } catch (err: any) {
+      console.error(`[firebaseService] fetchUserHistory failed for uid: "${uid}". Error:`, err);
+      throw err;
+    }
   } else {
-    return getLocalHistory();
+    return await LocalDB.getAll();
   }
 };
 
 export const fetchUserFavorites = async (uid: string): Promise<SavedGeneration[]> => {
+  console.log(`[firebaseService] fetchUserFavorites query started. uid: "${uid}"`);
   if (isFirebaseEnabled && uid !== "guest_user_local") {
-    const historyRef = collection(db, 'users', uid, 'history');
-    const q = query(historyRef, where('isFavorite', '==', true), orderBy('timestamp', 'desc'));
-    const querySnapshot = await getDocs(q);
-    const results: SavedGeneration[] = [];
-    querySnapshot.forEach((doc) => {
-      const data = doc.data();
-      results.push({
-        id: doc.id,
-        originalImageUrl: data.originalImageUrl,
-        generatedImageUrl: data.generatedImageUrl,
-        hairStyle: data.hairStyle,
-        hairColor: data.hairColor,
-        beardStyle: data.beardStyle,
-        beardColor: data.beardColor,
-        gender: data.gender,
-        timestamp: data.timestamp,
-        isFavorite: true
+    try {
+      const historyRef = collection(db, 'users', uid, 'history');
+      const q = query(historyRef, where('isFavorite', '==', true), orderBy('timestamp', 'desc'));
+      const querySnapshot = await getDocs(q);
+      const results: SavedGeneration[] = [];
+      querySnapshot.forEach((doc) => {
+        const data = doc.data();
+        results.push({
+          id: doc.id,
+          originalImageUrl: data.originalImageUrl,
+          generatedImageUrl: data.generatedImageUrl,
+          hairStyle: data.hairStyle,
+          hairColor: data.hairColor,
+          beardStyle: data.beardStyle,
+          beardColor: data.beardColor,
+          outfit: data.outfit,
+          makeup: data.makeup,
+          eyeColor: data.eyeColor,
+          treatments: data.treatments,
+          customPrompt: data.customPrompt,
+          gender: data.gender,
+          timestamp: data.timestamp,
+          isFavorite: true,
+          type: data.type || "single-photo",
+          sessionId: data.sessionId || null,
+          frontImage: data.frontImage || null,
+          frames: data.frames || null,
+          angleMetadata: data.angleMetadata || null,
+          appliedParameters: data.appliedParameters || null
+        });
       });
-    });
-    return results;
+      console.log(`[firebaseService] fetchUserFavorites loaded ${results.length} favorited items.`);
+      return results;
+    } catch (err: any) {
+      console.error(`[firebaseService] fetchUserFavorites failed for uid: "${uid}". Error:`, err);
+      throw err;
+    }
   } else {
-    return getLocalHistory().filter(i => i.isFavorite);
+    const history = await LocalDB.getAll();
+    return history.filter(i => i.isFavorite);
   }
 };
-
-export interface FavoritedStyle {
-  id: string;
-  category: string;
-  label: string;
-  image: string;
-  gender?: string;
-}
 
 export const toggleFavoritedStyle = async (
   uid: string,

@@ -6,7 +6,6 @@ interface CameraViewProps {
   onCapture3DBust?: (frames: string[]) => void;
   isActive: boolean;
   isSubscriber: boolean;
-  onOpen360Viewer: () => void;
   onOpenAI180Capture: () => void;
 }
 
@@ -15,7 +14,6 @@ export const CameraView: React.FC<CameraViewProps> = ({
   onCapture3DBust, 
   isActive,
   isSubscriber,
-  onOpen360Viewer,
   onOpenAI180Capture
 }) => {
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -32,6 +30,7 @@ export const CameraView: React.FC<CameraViewProps> = ({
   const [countdown, setCountdown] = useState<number>(3);
   const [scanProgress, setScanProgress] = useState<number>(0);
   const [scanInstructions, setScanInstructions] = useState<string>('Align face and look straight');
+  const [cameraMode, setCameraMode] = useState<'photo' | '180'>('photo');
 
   useEffect(() => {
     const checkDevices = async () => {
@@ -293,7 +292,11 @@ export const CameraView: React.FC<CameraViewProps> = ({
             <p className={`text-white text-xs font-black uppercase tracking-widest drop-shadow-md inline-block px-5 py-2 rounded-2xl backdrop-blur-xl border border-white/10 transition-all max-w-[240px] sm:max-w-xs truncate ${
               scanState === 'capturing' ? 'bg-indigo-900/60 border-indigo-500 shadow-[0_0_15px_rgba(79,70,229,0.3)]' : 'bg-black/45'
             }`}>
-              {scanState === 'idle' && "Align face & tap capture"}
+              {scanState === 'idle' && (
+                cameraMode === 'photo' 
+                  ? "Align face & tap capture" 
+                  : "Align face & tap to start 180° scan"
+              )}
               {scanState === 'countdown' && `Starting in ${countdown}...`}
               {scanState === 'capturing' && scanInstructions}
             </p>
@@ -319,37 +322,30 @@ export const CameraView: React.FC<CameraViewProps> = ({
           <div className="absolute bottom-0 left-0 right-0 z-20 px-6 pb-[calc(1.5rem+env(safe-area-inset-bottom,0px))] flex flex-col items-center pointer-events-none">
             {scanState === 'idle' ? (
               <>
-                {/* 180° Action Buttons Stack */}
-                <div className="flex flex-col gap-2 w-full max-w-[280px] pointer-events-auto mb-6">
-                  {/* Original 180° View Button */}
+                {/* Compact Camera Mode Selector */}
+                <div className="pointer-events-auto mb-6 flex bg-black/60 backdrop-blur-xl rounded-full p-0.5 border border-white/10 shadow-2xl relative overflow-hidden">
                   <button
                     type="button"
-                    onClick={onOpen360Viewer}
-                    className="w-full h-12 rounded-[24px] bg-black/60 backdrop-blur-xl border border-white/10 text-white flex items-center justify-center gap-2 shadow-xl hover:bg-white/10 active:scale-95 transition-all text-xs font-black uppercase tracking-widest"
+                    onClick={() => setCameraMode('photo')}
+                    className={`px-5 py-2 text-[10px] font-black uppercase tracking-widest rounded-full transition-all duration-200 ${
+                      cameraMode === 'photo'
+                        ? 'bg-white/10 text-white font-extrabold shadow-sm'
+                        : 'text-neutral-400 hover:text-neutral-200'
+                    }`}
                   >
-                    <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="text-indigo-400">
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
-                    </svg>
-                    <span className="flex items-center gap-1 whitespace-nowrap">
-                      {!isSubscriber && <span className="text-amber-400 text-xs">🔒</span>}
-                      180° View
-                    </span>
+                    Photo
                   </button>
-
-                  {/* Try AI 180° EXP Button */}
                   <button
                     type="button"
-                    onClick={onOpenAI180Capture}
-                    className="w-full h-12 rounded-[24px] bg-indigo-600/80 backdrop-blur-xl border border-indigo-500/30 text-white flex items-center justify-center gap-2 shadow-xl hover:bg-indigo-500/90 active:scale-95 transition-all text-xs font-black uppercase tracking-widest"
+                    onClick={() => setCameraMode('180')}
+                    className={`px-5 py-2 text-[10px] font-black uppercase tracking-widest rounded-full transition-all duration-200 flex items-center gap-1.5 ${
+                      cameraMode === '180'
+                        ? 'bg-indigo-600/30 text-indigo-300 font-extrabold border border-indigo-500/20 shadow-[0_0_12px_rgba(99,102,241,0.2)]'
+                        : 'text-neutral-400 hover:text-neutral-200'
+                    }`}
                   >
-                    <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} className="text-amber-300">
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
-                    </svg>
-                    <span className="flex items-center gap-1.5 whitespace-nowrap">
-                      {!isSubscriber && <span className="text-amber-400 text-xs">🔒</span>}
-                      Try AI 180°
-                      <span className="text-[8px] bg-amber-400 text-neutral-950 font-extrabold px-1.5 py-0.5 rounded leading-none">EXP</span>
-                    </span>
+                    {!isSubscriber && <span className="text-[10px]">🔒</span>}
+                    180°
                   </button>
                 </div>
 
@@ -370,11 +366,15 @@ export const CameraView: React.FC<CameraViewProps> = ({
                   {/* Center: Main Shutter Button */}
                   <button
                     id="camera-capture-button"
-                    onClick={handleCapture}
-                    className="w-18 h-18 rounded-full border-[4px] border-white/40 bg-white/20 hover:bg-white/30 backdrop-blur-md transition-all flex items-center justify-center active:scale-95 shadow-[0_0_20px_rgba(0,0,0,0.4)]"
-                    aria-label="Take Photo"
+                    onClick={cameraMode === 'photo' ? handleCapture : onOpenAI180Capture}
+                    className={`w-18 h-18 rounded-full border-[4px] bg-white/20 hover:bg-white/30 backdrop-blur-md transition-all flex items-center justify-center active:scale-95 shadow-[0_0_20px_rgba(0,0,0,0.4)] ${
+                      cameraMode === '180' ? 'border-indigo-500/40 shadow-[0_0_15px_rgba(99,102,241,0.2)] animate-pulse' : 'border-white/40'
+                    }`}
+                    aria-label={cameraMode === 'photo' ? "Take Photo" : "Start 180° Scan"}
                   >
-                    <div className="w-14 h-14 bg-white rounded-full shadow-inner"></div>
+                    <div className={`w-14 h-14 rounded-full shadow-inner transition-colors duration-300 ${
+                      cameraMode === '180' ? 'bg-indigo-500' : 'bg-white'
+                    }`}></div>
                   </button>
                 </div>
               </>

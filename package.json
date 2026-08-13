@@ -6,8 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview",
-    "test": "node scratch/test_three_sixty.js"
+    "preview": "vite preview"
   },
   "dependencies": {
     "@capacitor-firebase/authentication": "^8.3.0",

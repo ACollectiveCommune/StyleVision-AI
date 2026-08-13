@@ -7,21 +7,7 @@ import { auth, saveGeneration, uploadImageToStorage, toggleFavorite, SavedGenera
 import { 
   consumeCredit,
 } from '../services/billingService';
-import { 
-  saveGenerationJob, 
-  save360Preview,
-  getUser360Wallet,
-  get360PreviewsHistory,
-  refundCredit,
-  reserveCredit,
-  finalizeCharge
-} from '../services/threeSixtyService';
-import { 
-  ThreeSixtyGenerationJob, 
-  ThreeSixtyPreview 
-} from '../types';
 import { AESTHETIC_TREATMENTS } from '../constants/aesthetics';
-import { validateFrameQuality } from './ThreeSixtyViewer';
 import { purchasePremium } from '../services/iapService';
 import { PaywallView } from './PaywallView';
 import { triggerAppStoreReview } from '../services/rateService';
@@ -71,20 +57,7 @@ const compressImageBase64 = (base64Str: string, maxDim: number = 360, quality: n
   });
 };
 
-const validateFrameConsistency = async (
-  frameUrl: string,
-  angleId: string,
-  styleSnapshot: any
-): Promise<{ valid: boolean; reason?: string }> => {
-  const qualityCheck = await validateFrameQuality(frameUrl);
-  if (!qualityCheck.valid) {
-    return { valid: false, reason: `Quality failed: ${qualityCheck.reason}` };
-  }
-  if (frameUrl.length < 500) {
-    return { valid: false, reason: "Generated image is corrupt or empty" };
-  }
-  return { valid: true };
-};
+
 
 const getColorHexValue = (colorId: string): string => {
   const map: Record<string, string> = {
@@ -240,33 +213,7 @@ export const PhotoEditor: React.FC<PhotoEditorProps> = ({
   favoritedCreations,
   onToggleLookFavorite
 }) => {
-  const is180Mode = appState.editorMode === "interactive_180";
   const isAI180Mode = appState.editorMode === "ai_180";
-  const isAny180Mode = is180Mode || isAI180Mode;
-
-  // Top-level mount safety checks for interactive_180 mode
-  if (is180Mode) {
-    const session = appState.current180Session;
-    if (!session) {
-      throw new Error("Missing active 180° session data");
-    }
-    if (!session.frames) {
-      throw new Error("Incomplete 180° session: frames object is undefined");
-    }
-    const { left, front_left, front, front_right, right } = session.frames;
-    if (!left || !front_left || !front || !front_right || !right) {
-      const missingKeys = [];
-      if (!left) missingKeys.push("left");
-      if (!front_left) missingKeys.push("front_left");
-      if (!front) missingKeys.push("front");
-      if (!front_right) missingKeys.push("front_right");
-      if (!right) missingKeys.push("right");
-      throw new Error(`Incomplete 180° session: missing source frame for: ${missingKeys.join(", ")}`);
-    }
-    if (!appState.originalImage) {
-      throw new Error("Missing baseline front image reference");
-    }
-  }
 
   const [showOriginal, setShowOriginal] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -1062,17 +1009,7 @@ export const PhotoEditor: React.FC<PhotoEditorProps> = ({
     return true;
   });
 
-  if (is180Mode && (!appState.current180Session || !appState.originalImage)) {
-    return (
-      <div className="absolute inset-0 bg-slate-950 flex flex-col items-center justify-center gap-4 text-center text-white z-[99]">
-        <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-indigo-500"></div>
-        <div className="space-y-1">
-          <h3 className="text-sm font-bold">Loading 180° Editor...</h3>
-          <p className="text-[10px] text-slate-400">Aligning captured perspective frames</p>
-        </div>
-      </div>
-    );
-  }
+
 
   return (
     <div className="absolute inset-0 bg-black overflow-hidden">
@@ -1175,7 +1112,7 @@ export const PhotoEditor: React.FC<PhotoEditorProps> = ({
             type="button"
             onClick={() => onUpdateState({ showAI180Viewer: true })}
             className="w-10 h-10 rounded-full bg-indigo-600 backdrop-blur-xl flex items-center justify-center text-white border border-indigo-500/40 active:scale-90 transition-transform shadow-lg shadow-indigo-600/20"
-            title="View AI 180° Rotatable Preview"
+            title="View 180° Rotatable Preview"
           >
             <svg width={18} height={18} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5} className="text-amber-300">
               <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 1121.21 15.07M21 8v1h-1a8.001 8.001 0 00-6.19-2.07" />
@@ -1187,8 +1124,8 @@ export const PhotoEditor: React.FC<PhotoEditorProps> = ({
         <button 
           type="button"
           onClick={() => {
-            const confirmMsg = is180Mode 
-              ? "Exit 180° session? This will clear your captured angles."
+            const confirmMsg = isAI180Mode 
+              ? "Exit 180° session? This will clear your captured scan."
               : "Change photo? This will clear your current edits.";
             if (window.confirm(confirmMsg)) {
               onUpdateState({ 
@@ -2187,7 +2124,7 @@ export const PhotoEditor: React.FC<PhotoEditorProps> = ({
 
           {/* Sticky Generate Button Container */}
           <div className={`w-full flex flex-col items-center bg-gradient-to-t from-[#090909] via-[#090909] to-transparent pt-3 px-4 flex-shrink-0 z-10 ${
-            isAny180Mode
+            isAI180Mode
               ? "pb-[calc(2.2rem+env(safe-area-inset-bottom,0px))]"
               : "pb-[calc(5.2rem+env(safe-area-inset-bottom,0px))]"
           }`}>
@@ -2196,34 +2133,34 @@ export const PhotoEditor: React.FC<PhotoEditorProps> = ({
               onClick={handleGenerate}
               disabled={appState.isProcessing}
               className={`w-full py-3.5 rounded-2xl font-black text-xs uppercase tracking-widest transition-all flex items-center justify-center gap-2 shadow-xl ${
-                appState.isProcessing
-                  ? 'bg-neutral-800 text-neutral-500 cursor-not-allowed border border-white/5'
-                  : 'bg-gradient-to-r from-yellow-500 to-amber-500 hover:from-yellow-400 hover:to-amber-400 text-neutral-950 shadow-yellow-500/20 active:scale-[0.98]'
-              }`}
-            >
-              {appState.isProcessing ? (
-                <>
-                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-neutral-950"></div>
-                  <span>Designing your look...</span>
-                </>
-              ) : (
-                <>
-                  <Icons.Magic className="w-4 h-4 stroke-[2.5]" />
-                  <span>✨ {isAI180Mode ? "Generate AI 180° Style" : is180Mode ? "Generate 180° Preview" : "Generate New Look"}</span>
-                </>
-              )}
-            </button>
-            {!appState.isProcessing && (
-              <span className="text-[8px] font-black uppercase text-neutral-500 mt-1.5 tracking-wider">
-                {isAny180Mode 
-                  ? "Costs 1 Premium Credit" 
-                  : activeTab === 'prompt'
-                    ? "Costs 1 Premium Credit"
-                    : appState.isSubscriber
-                      ? "Free for Premium members (Unmetered)"
-                      : "Costs 1 Credit"}
-              </span>
-            )}
+            appState.isProcessing
+              ? 'bg-neutral-800 text-neutral-500 cursor-not-allowed border border-white/5'
+              : 'bg-gradient-to-r from-yellow-500 to-amber-500 hover:from-yellow-400 hover:to-amber-400 text-neutral-950 shadow-yellow-500/20 active:scale-[0.98]'
+          }`}
+        >
+          {appState.isProcessing ? (
+            <>
+              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-neutral-950"></div>
+              <span>Designing your look...</span>
+            </>
+          ) : (
+            <>
+              <Icons.Magic className="w-4 h-4 stroke-[2.5]" />
+              <span>✨ {isAI180Mode ? "Generate 180° Style" : "Generate New Look"}</span>
+            </>
+          )}
+        </button>
+        {!appState.isProcessing && (
+          <span className="text-[8px] font-black uppercase text-neutral-500 mt-1.5 tracking-wider">
+            {isAI180Mode 
+              ? "Costs 1 Premium Credit" 
+              : activeTab === 'prompt'
+                ? "Costs 1 Premium Credit"
+                : appState.isSubscriber
+                  ? "Free for Premium members (Unmetered)"
+                  : "Costs 1 Credit"}
+          </span>
+        )}
           </div>
         </div>
       ) : (

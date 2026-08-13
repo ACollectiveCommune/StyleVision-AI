@@ -1,5 +1,5 @@
 import { db } from "./firebase";
-import { collection, addDoc, query, where, getDocs, orderBy } from "firebase/firestore";
+import { collection, addDoc, query, where, getDocs, orderBy, deleteDoc } from "firebase/firestore";
 import { AI180Scan, AI180GeneratedStyle } from "../types";
 
 // Local storage keys for guest/local fallback mode
@@ -193,5 +193,60 @@ export const getAI180StylesForScan = async (
   } catch (err) {
     console.warn("[FIRESTORE] Failed to fetch styles, returning local styles:", err);
     return filteredLocal;
+  }
+};
+
+export const deleteAI180Style = async (
+  uid: string,
+  scanId: string,
+  styleSnapshot: {
+    hairstyleId: string;
+    hairColorId: string;
+    beardId: string;
+    beardColorId: string;
+    outfitId: string;
+    makeup: string;
+    eyeColorId?: string;
+  }
+): Promise<void> => {
+  // 1. Delete from LocalStorage
+  try {
+    const localStyles: AI180GeneratedStyle[] = JSON.parse(localStorage.getItem(LOCAL_STYLES_KEY) || "[]");
+    const updatedStyles = localStyles.filter(s => {
+      if (!s) return false;
+      const match = s.scanId === scanId &&
+        s.hairstyleId === styleSnapshot.hairstyleId &&
+        s.hairColorId === styleSnapshot.hairColorId &&
+        s.beardId === styleSnapshot.beardId &&
+        s.beardColorId === styleSnapshot.beardColorId &&
+        s.outfitId === styleSnapshot.outfitId &&
+        s.makeup === styleSnapshot.makeup;
+      return !match;
+    });
+    localStorage.setItem(LOCAL_STYLES_KEY, JSON.stringify(updatedStyles));
+  } catch (e) {
+    console.error("[LOCAL STORAGE] Failed to delete style:", e);
+  }
+
+  // 2. Delete from Firestore if authenticated
+  if (uid !== "guest_user_local" && uid) {
+    try {
+      const stylesRef = collection(db, "users", uid, "ai180_styles");
+      const q = query(
+        stylesRef,
+        where("scanId", "==", scanId),
+        where("hairstyleId", "==", styleSnapshot.hairstyleId),
+        where("hairColorId", "==", styleSnapshot.hairColorId),
+        where("beardId", "==", styleSnapshot.beardId),
+        where("beardColorId", "==", styleSnapshot.beardColorId),
+        where("outfitId", "==", styleSnapshot.outfitId),
+        where("makeup", "==", styleSnapshot.makeup)
+      );
+      const snapshot = await getDocs(q);
+      const deletePromises = snapshot.docs.map(doc => deleteDoc(doc.ref));
+      await Promise.all(deletePromises);
+    } catch (err) {
+      console.warn("[FIRESTORE] Failed to delete style:", err);
+    }
   }
 };

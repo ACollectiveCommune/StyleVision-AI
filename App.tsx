@@ -7,11 +7,10 @@ import { LoginView } from './components/LoginView';
 import { FavoritesView } from './components/FavoritesView';
 import { PaywallView } from './components/PaywallView';
 import { OnboardingView } from './components/OnboardingView';
-import { ThreeSixtyViewer } from './components/ThreeSixtyViewer';
-import { ENABLE_AI_180_EXPERIMENT } from './constants/featureFlags';
 import { AI180Viewer } from './components/AI180Viewer';
 import { AI180Capture } from './components/AI180Capture';
-import { extractAnchorFrames } from './services/AI180ViewProcessor';
+import { extractAnchorFrames, normalizeAndSortMetadata } from './services/AI180ViewProcessor';
+
 import { saveAI180Scan } from './services/AI180FirestoreService';
 import { Icons, HAIR_STYLES_MALE, HAIR_STYLES_FEMALE, HAIR_COLORS, BEARD_STYLES, BEARD_COLORS, OUTFIT_STYLES, MAKEUP_STYLES } from './constants';
 import { 
@@ -31,7 +30,7 @@ import {
   isFirebaseEnabled
 } from './services/firebase';
 import { subscribeToCredits, incrementUserCredits, consumeCredit } from './services/billingService';
-import { getUser360Wallet } from './services/threeSixtyService';
+
 import { initializeBilling, purchasePremium, manageBillingSubscription, logoutBilling, isIOS } from './services/iapService';
 import { AdRewardModal } from './components/AdRewardModal';
 import { LegalDocumentsModal } from './components/LegalDocumentsModal';
@@ -39,7 +38,7 @@ import { initializeAdMob, showRewardedVideoAd } from './services/adService';
 import { User } from 'firebase/auth';
 import { AestheticsView } from './components/AestheticsView';
 import { PhotoQualityModal } from './components/PhotoQualityModal';
-import { generateStylePreview } from './services/geminiService';
+import { generateStylePreview } from './services/geminiService';import { generateStylePreview, analyzeScanAngles } from './services/geminiService';
 import { downloadOrShareImage } from './services/shareService';
 import {
   MALE_HAIR_PREVIEWS,
@@ -173,11 +172,7 @@ const App: React.FC = () => {
     subscriptionTier: 'none',
     selectedTreatments: [],
     isSubscriber: false,
-    subscriptionPlan: null,
-    available360Credits: 0,
-    active360PreviewId: null,
-    is360FeatureEnabled: true,
-    show360Viewer: false,
+    subscriptionPlan: null
   });
 
   const [currentUser, setCurrentUser] = useState<User | null>(null);
@@ -190,6 +185,8 @@ const App: React.FC = () => {
   const [pendingImage, setPendingImage] = useState<string | null>(null);
   const [favoritedStyles, setFavoritedStyles] = useState<FavoritedStyle[]>([]);
   const [favoritedCreations, setFavoritedCreations] = useState<SavedGeneration[]>([]);
+  const [salonSubTab, setSalonSubTab] = useState<'hair' | 'beard' | 'color'>('hair');
+  const [styleSubTab, setStyleSubTab] = useState<'outfits' | 'makeup'>('outfits');
   const [loadingCreations, setLoadingCreations] = useState<boolean>(true);
   const [hasCompletedOnboarding, setHasCompletedOnboarding] = useState<boolean>(() => {
     return localStorage.getItem('has_completed_onboarding') === 'true';
@@ -272,6 +269,11 @@ const App: React.FC = () => {
       if (match) {
         updates.selectedMakeup = match;
       }
+    } else if (style.category === 'color') {
+      const match = HAIR_COLORS.find(c => c.id === style.id);
+      if (match) {
+        updates.selectedHairColor = match;
+      }
     }
     updateState(updates);
   };
@@ -317,16 +319,7 @@ const App: React.FC = () => {
 
       if (user) {
         try {
-          // Listen/fetch 360 wallet
-          getUser360Wallet(user.uid).then((wallet) => {
-            updateState({
-              isSubscriber: wallet.subscriptionStatus === "active",
-              subscriptionPlan: wallet.subscriptionPlan,
-              subscriptionCredits: wallet.subscriptionCredits,
-              purchasedCredits: wallet.purchasedCredits,
-              available360Credits: wallet.subscriptionCredits + wallet.purchasedCredits
-            });
-          }).catch(console.error);
+
 
           // Listen to active credits balance
           const unsubBilling = subscribeToCredits(user.uid, (credits) => {
@@ -394,8 +387,7 @@ const App: React.FC = () => {
             generationCount: 0,
             credits: 999,
             isSubscriber: isLocalMode,
-            subscriptionPlan: isLocalMode ? "premium" : null,
-            available360Credits: 999
+            subscriptionPlan: isLocalMode ? "premium" : null
           });
         }
       } else {
@@ -406,9 +398,7 @@ const App: React.FC = () => {
           generationCount: 0,
           credits: 999,
           isSubscriber: isLocalMode,
-          subscriptionPlan: isLocalMode ? "premium" : null,
-          available360Credits: 999,
-          active360PreviewId: null
+          subscriptionPlan: isLocalMode ? "premium" : null
         });
         setShowOnboardingPaywall(false);
       }
@@ -445,7 +435,7 @@ const App: React.FC = () => {
   const [selectedTemplate, setSelectedTemplate] = useState<PreviewPreset | null>(null);
   const [salonFilter, setSalonFilter] = useState<string>('all');
   const [meFilter, setMeFilter] = useState<'All' | 'Editor' | 'Salon' | 'AI Outfit'>('All');
-  const [meTab, setMeTab] = useState<'creations' | 'styles'>('creations');
+  const [meTab, setMeTab] = useState<'creations' | 'styles' | '180'>('creations');
   const [salonGender, setSalonGender] = useState<Gender>(Gender.MALE);
   const [outfitGender, setOutfitGender] = useState<Gender>(Gender.MALE);
   const [outfitCategory, setOutfitCategory] = useState<string>('all');
@@ -546,7 +536,6 @@ const App: React.FC = () => {
       customPrompt: '',
       isProcessing: false, // Prevent auto-run
       editorMode: "single_photo",
-      captured180Frames: undefined,
     });
   };
 
@@ -554,7 +543,6 @@ const App: React.FC = () => {
     resetEditingSessionForNewPhoto(imageDataUrl);
     updateState({ currentMode: AppMode.EDITOR });
   };
-
   const handleCapture = (imageDataUrl: string) => {
     applyCapturedImage(imageDataUrl);
   };
@@ -564,35 +552,58 @@ const App: React.FC = () => {
     updateState({ isProcessing: true });
     const uid = currentUser?.uid || "guest_user_local";
     try {
-      // 1. Extract 9 sharpest anchor views
+      // 1. Extract sharpest anchor views (fully client-side & extremely fast)
       const anchors = await extractAnchorFrames(rawFrames);
       
-      // 2. Upload frames to Firebase Storage
-      const uploadPromises = anchors.map((base64) => 
-        uploadImageToStorage(uid, base64, 'original')
-      );
-      const urls = await Promise.all(uploadPromises);
+      const centerIdx = Math.floor(anchors.length / 2);
+      const frontFrameLocal = anchors[centerIdx];
 
-      // 3. Save scan to Firestore / LocalStorage
-      const scanId = await saveAI180Scan(uid, {
-        userId: uid,
-        sourceFrames: urls,
-        createdAt: new Date().toISOString(),
-        version: '1.0'
-      });
+      // Generate a temporary scanId instantly
+      const tempScanId = `temp_${Date.now()}`;
 
-      // Cache original high-resolution frames in memory to bypass LocalStorage downscaling limits
+      // Cache original high-resolution frames in memory using the temporary ID
       if (!(window as any).localScanFramesCache) {
         (window as any).localScanFramesCache = {};
       }
-      (window as any).localScanFramesCache[scanId] = anchors;
+      (window as any).localScanFramesCache[tempScanId] = anchors;
 
-      // 4. Transition straight to Editor mode with Front View baseline
+      // Start speculative background upload & angle analysis immediately
+      const backgroundPromise = (async () => {
+        try {
+          const rawMetadata = await analyzeScanAngles(anchors);
+          const { sortedFrames, sortedMeta } = normalizeAndSortMetadata(rawMetadata, anchors);
+          const uploadPromises = sortedFrames.map((base64) => 
+            uploadImageToStorage(uid, base64, 'original')
+          );
+          const urls = await Promise.all(uploadPromises);
+          
+          const scanId = await saveAI180Scan(uid, {
+            userId: uid,
+            sourceFrames: urls,
+            metadata: sortedMeta,
+            createdAt: new Date().toISOString(),
+            version: '1.0'
+          });
+
+          // Cache the sorted base64 frames under the real scan ID
+          (window as any).localScanFramesCache[scanId] = sortedFrames;
+
+          return { scanId, urls, sortedFrames, sortedMeta };
+        } catch (error) {
+          console.error("Background AI 180 upload/processing failed:", error);
+          throw error;
+        }
+      })();
+
+      // Save upload promise on window object so other views can await it
+      (window as any).activeAI180UploadPromise = backgroundPromise;
+
+      // 6. Transition straight to Editor mode instantly using local base64 front image
       updateState({
         editorMode: "ai_180",
         currentMode: AppMode.EDITOR,
-        originalImage: urls[4], // Front view frame as baseline
-        activeAI180ScanId: scanId,
+        originalImage: frontFrameLocal, // Instant baseline preview
+        activeAI180ScanId: tempScanId,
         isProcessing: false
       });
     } catch (err: any) {
@@ -651,6 +662,24 @@ const App: React.FC = () => {
       updates.selectedBeardColor = state.selectedBeardColor || BEARD_COLORS[0];
       updates.selectedOutfit = state.selectedOutfit || OUTFIT_STYLES[0];
       updates.selectedMakeup = state.selectedMakeup || MAKEUP_STYLES[0];
+    } else if (template.category === 'color') {
+      const matchColor = HAIR_COLORS.find(x => x.id === template.id) || HAIR_COLORS[0];
+      
+      updates.selectedHairColor = matchColor;
+      updates.selectedHairStyle = genderChanged ? defaultHair : (state.selectedHairStyle || defaultHair);
+      updates.selectedBeardStyle = isFemale ? BEARD_STYLES[0] : (state.selectedBeardStyle || BEARD_STYLES[0]);
+      updates.selectedBeardColor = state.selectedBeardColor || BEARD_COLORS[0];
+      updates.selectedOutfit = state.selectedOutfit || OUTFIT_STYLES[0];
+      updates.selectedMakeup = state.selectedMakeup || MAKEUP_STYLES[0];
+    } else if (template.category === 'makeup') {
+      const matchMakeup = MAKEUP_STYLES.find(x => x.id === template.id) || MAKEUP_STYLES[0];
+      
+      updates.selectedMakeup = matchMakeup;
+      updates.selectedHairStyle = genderChanged ? defaultHair : (state.selectedHairStyle || defaultHair);
+      updates.selectedHairColor = state.selectedHairColor || HAIR_COLORS[0];
+      updates.selectedBeardStyle = isFemale ? BEARD_STYLES[0] : (state.selectedBeardStyle || BEARD_STYLES[0]);
+      updates.selectedBeardColor = state.selectedBeardColor || BEARD_COLORS[0];
+      updates.selectedOutfit = state.selectedOutfit || OUTFIT_STYLES[0];
     }
 
     updateState(updates);
@@ -785,19 +814,37 @@ const App: React.FC = () => {
   };
 
   const handleLoadGeneration = (generation: SavedGeneration) => {
-    updateState({
-      originalImage: generation.originalImageUrl,
-      currentImage: generation.generatedImageUrl,
-      gender: generation.gender as Gender,
-      selectedHairStyle: { id: generation.hairStyle, label: generation.hairStyle, category: 'hair', type: 'style' },
-      selectedHairColor: { id: generation.hairColor, label: generation.hairColor, category: 'hair', type: 'color' },
-      selectedBeardStyle: { id: generation.beardStyle, label: generation.beardStyle, category: 'beard', type: 'style' },
-      selectedBeardColor: { id: generation.beardColor, label: generation.beardColor, category: 'beard', type: 'color' },
-      selectedOutfit: generation.outfit ? { id: generation.outfit, label: generation.outfit, category: 'outfit', type: 'style' } : OUTFIT_STYLES[0],
-      selectedMakeup: generation.makeup ? { id: generation.makeup, label: generation.makeup, category: 'makeup', type: 'style' } : MAKEUP_STYLES[0],
-      currentMode: AppMode.EDITOR,
-      customPrompt: generation.customPrompt || '',
-    });
+    if (generation.type === "180-preview") {
+      updateState({
+        originalImage: generation.originalImageUrl,
+        currentImage: generation.generatedImageUrl,
+        gender: generation.gender as Gender,
+        selectedHairStyle: { id: generation.hairStyle, label: generation.hairStyle, category: 'hair', type: 'style' },
+        selectedHairColor: { id: generation.hairColor, label: generation.hairColor, category: 'hair', type: 'color' },
+        selectedBeardStyle: { id: generation.beardStyle, label: generation.beardStyle, category: 'beard', type: 'style' },
+        selectedBeardColor: { id: generation.beardColor, label: generation.beardColor, category: 'beard', type: 'color' },
+        selectedOutfit: generation.outfit ? { id: generation.outfit, label: generation.outfit, category: 'outfit', type: 'style' } : OUTFIT_STYLES[0],
+        selectedMakeup: generation.makeup ? { id: generation.makeup, label: generation.makeup, category: 'makeup', type: 'style' } : MAKEUP_STYLES[0],
+        customPrompt: generation.customPrompt || '',
+        activeAI180Favorite: generation,
+        showAI180Viewer: true
+      });
+    } else {
+      updateState({
+        originalImage: generation.originalImageUrl,
+        currentImage: generation.generatedImageUrl,
+        gender: generation.gender as Gender,
+        selectedHairStyle: { id: generation.hairStyle, label: generation.hairStyle, category: 'hair', type: 'style' },
+        selectedHairColor: { id: generation.hairColor, label: generation.hairColor, category: 'hair', type: 'color' },
+        selectedBeardStyle: { id: generation.beardStyle, label: generation.beardStyle, category: 'beard', type: 'style' },
+        selectedBeardColor: { id: generation.beardColor, label: generation.beardColor, category: 'beard', type: 'color' },
+        selectedOutfit: generation.outfit ? { id: generation.outfit, label: generation.outfit, category: 'outfit', type: 'style' } : OUTFIT_STYLES[0],
+        selectedMakeup: generation.makeup ? { id: generation.makeup, label: generation.makeup, category: 'makeup', type: 'style' } : MAKEUP_STYLES[0],
+        currentMode: AppMode.EDITOR,
+        customPrompt: generation.customPrompt || '',
+        activeAI180Favorite: null
+      });
+    }
   };
 
   // Render loading screen while verifying credentials
@@ -838,13 +885,6 @@ const App: React.FC = () => {
               isActive={state.currentMode === AppMode.EDITOR && state.originalImage === null && !showOnboardingPaywall} 
               onCapture={handleCapture} 
               isSubscriber={state.isSubscriber}
-              onOpen360Viewer={() => {
-                if (state.isSubscriber) {
-                  updateState({ show360Viewer: true });
-                } else {
-                  setShowOnboardingPaywall(true);
-                }
-              }}
               onOpenAI180Capture={() => {
                 if (state.isSubscriber) {
                   setShowAI180Capture(true);
@@ -873,19 +913,7 @@ const App: React.FC = () => {
                     >
                       Retry
                     </button>
-                    <button
-                      onClick={() => {
-                        reset();
-                        updateState({ 
-                          show360Viewer: true, 
-                          editorMode: "single_photo", 
-                          current180Session: null 
-                        });
-                      }}
-                      className="w-full py-3 bg-slate-800 hover:bg-slate-700 rounded-xl text-sm font-semibold transition font-sans"
-                    >
-                      Return to scan
-                    </button>
+
                     <button
                       onClick={() => {
                         reset();
@@ -905,9 +933,17 @@ const App: React.FC = () => {
               )}
             >
               <PhotoEditor 
-                uid={currentUser.uid}
-                appState={state} 
-                onUpdateState={updateState} 
+                uid={currentUser?.uid || "guest_user_local"}
+                appState={{ ...state, favoritedCreations, favoritedStyles }} 
+                onUpdateState={(updates) => {
+                  if (updates.favoritedCreations !== undefined) {
+                    setFavoritedCreations(updates.favoritedCreations);
+                  }
+                  if (updates.favoritedStyles !== undefined) {
+                    setFavoritedStyles(updates.favoritedStyles);
+                  }
+                  updateState(updates);
+                }} 
                 onTriggerAd={handleTriggerAd}
                 favoritedStyles={favoritedStyles}
                 onToggleStyleFavorite={handleToggleStyleFavorite}
@@ -931,146 +967,207 @@ const App: React.FC = () => {
               <div className={`sticky top-0 z-20 bg-neutral-950/80 backdrop-blur-md px-6 pt-[calc(16px+env(safe-area-inset-top,20px))] pb-4 border-b transition-all duration-300 ${
                 salonScrolled ? 'border-white/10 shadow-[0_4px_20px_rgba(0,0,0,0.4)]' : 'border-transparent shadow-none'
               }`}>
-                {/* Gender Switcher Tab bar */}
-                <div className="flex bg-white/5 p-1 rounded-2xl border border-white/5">
+                {/* Compact secondary selector: HAIR | BEARD | COLOR */}
+                <div className="flex bg-white/5 p-0.5 rounded-xl border border-white/5 mb-4">
                   <button
                     type="button"
-                    onClick={() => { setSalonGender(Gender.MALE); setSalonFilter('all'); }}
-                    className={`flex-1 py-2 text-center text-xs font-black uppercase tracking-widest rounded-xl transition-all duration-200 ${
-                      salonGender === Gender.MALE 
-                        ? 'bg-indigo-600 text-white shadow-[0_4px_12px_rgba(99,102,241,0.25)]' 
+                    onClick={() => {
+                      setSalonSubTab('hair');
+                      setSalonFilter('all');
+                    }}
+                    className={`flex-1 py-1.5 text-[10px] font-black uppercase tracking-wider rounded-lg transition-all duration-200 ${
+                      salonSubTab === 'hair'
+                        ? 'bg-white/10 text-white shadow-sm'
                         : 'text-neutral-400 hover:text-neutral-200'
                     }`}
                   >
-                    Male Styles
+                    Hair
                   </button>
+                  {salonGender === Gender.MALE && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSalonSubTab('beard');
+                        setSalonFilter('all');
+                      }}
+                      className={`flex-1 py-1.5 text-[10px] font-black uppercase tracking-wider rounded-lg transition-all duration-200 ${
+                        salonSubTab === 'beard'
+                          ? 'bg-white/10 text-white shadow-sm'
+                          : 'text-neutral-400 hover:text-neutral-200'
+                      }`}
+                    >
+                      Beard
+                    </button>
+                  )}
                   <button
                     type="button"
-                    onClick={() => { setSalonGender(Gender.FEMALE); setSalonFilter('all'); }}
-                    className={`flex-1 py-2 text-center text-xs font-black uppercase tracking-widest rounded-xl transition-all duration-200 ${
-                      salonGender === Gender.FEMALE 
-                        ? 'bg-indigo-600 text-white shadow-[0_4px_12px_rgba(99,102,241,0.25)]' 
+                    onClick={() => {
+                      setSalonSubTab('color');
+                      setSalonFilter('all');
+                    }}
+                    className={`flex-1 py-1.5 text-[10px] font-black uppercase tracking-wider rounded-lg transition-all duration-200 ${
+                      salonSubTab === 'color'
+                        ? 'bg-white/10 text-white shadow-sm'
                         : 'text-neutral-400 hover:text-neutral-200'
                     }`}
                   >
-                    Female Styles
+                    Color
                   </button>
                 </div>
 
-                {/* Salon Categories filter row */}
-                <div className="flex overflow-x-auto no-scrollbar space-x-2 items-center mt-4 h-8 flex-shrink-0">
-                  {(salonGender === Gender.MALE 
-                    ? [
-                        { id: 'all', label: 'All' },
-                        { id: 'original', label: 'Original' },
-                        { id: 'short', label: 'Short' },
-                        { id: 'fade', label: 'Fade' },
-                        { id: 'medium', label: 'Medium' },
-                        { id: 'long', label: 'Long' },
-                        { id: 'curly', label: 'Curly' },
-                        { id: 'braids', label: 'Braids' },
-                        { id: 'locs', label: 'Locs' },
-                        { id: 'trendy', label: 'Trendy' },
-                        { id: 'mature', label: 'Mature' },
-                      ]
-                    : [
-                        { id: 'all', label: 'All' },
-                        { id: 'original', label: 'Original' },
-                        { id: 'short', label: 'Short' },
-                        { id: 'medium', label: 'Medium' },
-                        { id: 'long', label: 'Long' },
-                        { id: 'bangs', label: 'Bangs' },
-                        { id: 'bob', label: 'Bob' },
-                        { id: 'braids', label: 'Braids' },
-                        { id: 'ponytails', label: 'Ponytails' },
-                        { id: 'buns', label: 'Buns' },
-                        { id: 'curly', label: 'Curly' },
-                        { id: 'natural', label: 'Natural' },
-                        { id: 'locs', label: 'Locs' },
-                        { id: 'trendy', label: 'Trendy' },
-                        { id: 'formal', label: 'Formal' },
-                      ]
-                  ).map(cat => (
+                {/* Gender Switcher Tab bar */}
+                {salonSubTab !== 'color' && (
+                  <div className="flex bg-white/5 p-1 rounded-2xl border border-white/5">
                     <button
-                      key={cat.id}
                       type="button"
-                      onClick={() => setSalonFilter(cat.id)}
-                      className={`px-3 py-1 rounded-full text-[10px] font-bold transition-all whitespace-nowrap ${
-                        salonFilter === cat.id
-                          ? 'bg-white text-black font-extrabold shadow-sm'
-                          : 'bg-white/5 border border-white/10 text-white/60 hover:text-white hover:bg-white/10'
+                      onClick={() => { setSalonGender(Gender.MALE); setSalonFilter('all'); }}
+                      className={`flex-1 py-2 text-center text-xs font-black uppercase tracking-widest rounded-xl transition-all duration-200 ${
+                        salonGender === Gender.MALE 
+                          ? 'bg-indigo-600 text-white shadow-[0_4px_12px_rgba(99,102,241,0.25)]' 
+                          : 'text-neutral-400 hover:text-neutral-200'
                       }`}
                     >
-                      {cat.label}
+                      Male Styles
                     </button>
-                  ))}
-                </div>
+                    <button
+                      type="button"
+                      onClick={() => { setSalonGender(Gender.FEMALE); setSalonFilter('all'); }}
+                      className={`flex-1 py-2 text-center text-xs font-black uppercase tracking-widest rounded-xl transition-all duration-200 ${
+                        salonGender === Gender.FEMALE 
+                          ? 'bg-indigo-600 text-white shadow-[0_4px_12px_rgba(99,102,241,0.25)]' 
+                          : 'text-neutral-400 hover:text-neutral-200'
+                      }`}
+                    >
+                      Female Styles
+                    </button>
+                  </div>
+                )}
+
+                {/* Salon Categories filter row */}
+                {salonSubTab === 'hair' && (
+                  <div className="flex overflow-x-auto no-scrollbar space-x-2 items-center mt-4 h-8 flex-shrink-0">
+                    {(salonGender === Gender.MALE 
+                      ? [
+                          { id: 'all', label: 'All' },
+                          { id: 'original', label: 'Original' },
+                          { id: 'short', label: 'Short' },
+                          { id: 'fade', label: 'Fade' },
+                          { id: 'medium', label: 'Medium' },
+                          { id: 'long', label: 'Long' },
+                          { id: 'curly', label: 'Curly' },
+                          { id: 'braids', label: 'Braids' },
+                          { id: 'locs', label: 'Locs' },
+                          { id: 'trendy', label: 'Trendy' },
+                          { id: 'mature', label: 'Mature' },
+                        ]
+                      : [
+                          { id: 'all', label: 'All' },
+                          { id: 'original', label: 'Original' },
+                          { id: 'short', label: 'Short' },
+                          { id: 'medium', label: 'Medium' },
+                          { id: 'long', label: 'Long' },
+                          { id: 'bangs', label: 'Bangs' },
+                          { id: 'bob', label: 'Bob' },
+                          { id: 'braids', label: 'Braids' },
+                          { id: 'ponytails', label: 'Ponytails' },
+                          { id: 'buns', label: 'Buns' },
+                          { id: 'curly', label: 'Curly' },
+                          { id: 'natural', label: 'Natural' },
+                          { id: 'locs', label: 'Locs' },
+                          { id: 'trendy', label: 'Trendy' },
+                          { id: 'formal', label: 'Formal' },
+                        ]
+                    ).map(cat => (
+                      <button
+                        key={cat.id}
+                        type="button"
+                        onClick={() => setSalonFilter(cat.id)}
+                        className={`px-3 py-1 rounded-full text-[10px] font-bold transition-all whitespace-nowrap ${
+                          salonFilter === cat.id
+                            ? 'bg-white text-black font-extrabold shadow-sm'
+                            : 'bg-white/5 border border-white/10 text-white/60 hover:text-white hover:bg-white/10'
+                        }`}
+                      >
+                        {cat.label}
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
 
               {/* Grid of Templates */}
               <div className="px-6 mt-6">
                 <div className="grid grid-cols-2 gap-4">
                   {(() => {
-                    const rawFiltered = salonGender === Gender.MALE ? MALE_HAIR_PREVIEWS : FEMALE_HAIR_PREVIEWS;
+                    let rawFiltered: PreviewPreset[] = [];
+                    if (salonSubTab === 'hair') {
+                      rawFiltered = salonGender === Gender.MALE ? MALE_HAIR_PREVIEWS : FEMALE_HAIR_PREVIEWS;
+                    } else if (salonSubTab === 'beard') {
+                      rawFiltered = MALE_BEARD_PREVIEWS;
+                    } else if (salonSubTab === 'color') {
+                      rawFiltered = COLOR_PREVIEWS;
+                    }
+
                     const filtered = rawFiltered.filter(t => {
+                      if (salonSubTab !== 'hair') return true;
                       if (salonFilter === 'all') return true;
                       if (salonFilter === 'original') return t.id === 'original';
                       return t.subcategory === salonFilter;
                     });
                   
-                  return filtered.map(t => (
-                    <button
-                      key={t.id + t.image}
-                      type="button"
-                      onClick={() => handleSelectTemplateForPreview(t)}
-                      className="group relative flex flex-col items-center bg-neutral-900/40 hover:bg-neutral-900/70 border border-white/5 hover:border-white/10 rounded-2xl overflow-hidden p-2 transition-all text-left"
-                    >
-                      <div className="relative w-full aspect-[4/5] rounded-xl overflow-hidden bg-neutral-950 mb-2">
-                        <img 
-                          src={t.image} 
-                          alt={t.label} 
-                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                        />
-                        {/* Favorites Style Heart Button */}
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleToggleStyleFavorite({
-                              id: t.id,
-                              category: t.category,
-                              label: t.label,
-                              image: t.image,
-                              gender: t.gender || (salonGender === Gender.MALE ? 'Male' : 'Female')
-                            });
-                          }}
-                          className="absolute top-2 right-2 w-7 h-7 rounded-full bg-black/60 border border-white/10 flex items-center justify-center text-white active:scale-90 hover:bg-black/85 transition-all z-10"
-                        >
-                          <svg
-                            className={`w-3.5 h-3.5 ${favoritedStyles.some(f => f.id === t.id) ? 'fill-red-500 stroke-red-500' : 'stroke-white fill-none'}`}
-                            viewBox="0 0 24 24"
-                            strokeWidth="2.5"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
+                    return filtered.map(t => (
+                      <button
+                        key={t.id + t.image}
+                        type="button"
+                        onClick={() => handleSelectTemplateForPreview(t)}
+                        className="group relative flex flex-col items-center bg-neutral-900/40 hover:bg-neutral-900/70 border border-white/5 hover:border-white/10 rounded-2xl overflow-hidden p-2 transition-all text-left"
+                      >
+                        <div className="relative w-full aspect-[4/5] rounded-xl overflow-hidden bg-neutral-950 mb-2">
+                          <img 
+                            src={t.image} 
+                            alt={t.label} 
+                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                          />
+                          {/* Favorites Style Heart Button */}
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleToggleStyleFavorite({
+                                id: t.id,
+                                category: t.category,
+                                label: t.label,
+                                image: t.image,
+                                gender: t.gender || (salonSubTab === 'beard' ? 'Male' : (salonGender === Gender.MALE ? 'Male' : 'Female'))
+                              });
+                            }}
+                            className="absolute top-2 right-2 w-7 h-7 rounded-full bg-black/60 border border-white/10 flex items-center justify-center text-white active:scale-90 hover:bg-black/85 transition-all z-10"
                           >
-                            <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
-                          </svg>
-                        </button>
-                      </div>
-                      <div className="w-full px-1">
-                        <span className="text-[11px] font-extrabold text-white group-hover:text-indigo-400 transition-colors leading-none">{t.label}</span>
-                        <p className="text-[9px] text-neutral-500 font-semibold truncate leading-relaxed mt-0.5">{t.description}</p>
-                      </div>
-                    </button>
-                  ));
-                })()}
+                            <svg
+                              className={`w-3.5 h-3.5 ${favoritedStyles.some(f => f.id === t.id) ? 'fill-red-500 stroke-red-500' : 'stroke-white fill-none'}`}
+                              viewBox="0 0 24 24"
+                              strokeWidth="2.5"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                            >
+                              <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
+                            </svg>
+                          </button>
+                        </div>
+                        <div className="w-full px-1">
+                          <span className="text-[11px] font-extrabold text-white group-hover:text-indigo-400 transition-colors leading-none">{t.label}</span>
+                          <p className="text-[9px] text-neutral-500 font-semibold truncate leading-relaxed mt-0.5">{t.description}</p>
+                        </div>
+                      </button>
+                    ));
+                  })()}
                 </div>
               </div>
             </div>
           </div>
         )}
 
-        {state.currentMode === AppMode.OUTFIT && (
+        {state.currentMode === AppMode.STYLE && (
           <div className="absolute inset-0 bg-neutral-950 flex flex-col pb-0 pt-0 overflow-hidden z-10 animate-in fade-in duration-300">
             
             {/* Scrollable list container */}
@@ -1079,112 +1176,194 @@ const App: React.FC = () => {
               onScroll={(e) => setOutfitScrolled(e.currentTarget.scrollTop > 10)}
             >
               {/* Sticky Header wrapper */}
-              <div className={`sticky top-0 z-20 bg-neutral-950/80 backdrop-blur-md px-6 pt-[calc(16px+env(safe-area-inset-top,20px))] pb-5 border-b transition-all duration-300 ${
+              <div className={`sticky top-0 z-20 bg-neutral-950/80 backdrop-blur-md px-6 pt-[calc(16px+env(safe-area-inset-top,20px))] pb-4 border-b transition-all duration-300 ${
                 outfitScrolled ? 'border-white/10 shadow-[0_4px_20px_rgba(0,0,0,0.4)]' : 'border-transparent shadow-none'
               }`}>
-                {/* Gender Switcher Tab bar */}
-                <div className="flex bg-white/5 p-1 rounded-2xl border border-white/5 mb-5">
+                {/* Secondary sub-tab selector: OUTFITS | MAKEUP */}
+                <div className="flex bg-white/5 p-0.5 rounded-xl border border-white/5 mb-4">
                   <button
                     type="button"
-                    onClick={() => {
-                      setOutfitGender(Gender.MALE);
-                      setOutfitCategory('all');
-                    }}
-                    className={`flex-1 py-2 text-center text-xs font-black uppercase tracking-widest rounded-xl transition-all duration-200 ${
-                      outfitGender === Gender.MALE 
-                        ? 'bg-indigo-600 text-white shadow-[0_4px_12px_rgba(99,102,241,0.25)]' 
+                    onClick={() => setStyleSubTab('outfits')}
+                    className={`flex-1 py-1.5 text-[10px] font-black uppercase tracking-wider rounded-lg transition-all duration-200 ${
+                      styleSubTab === 'outfits'
+                        ? 'bg-white/10 text-white shadow-sm'
                         : 'text-neutral-400 hover:text-neutral-200'
                     }`}
                   >
-                    Male Outfits
+                    Outfits
                   </button>
                   <button
                     type="button"
-                    onClick={() => {
-                      setOutfitGender(Gender.FEMALE);
-                      setOutfitCategory('all');
-                    }}
-                    className={`flex-1 py-2 text-center text-xs font-black uppercase tracking-widest rounded-xl transition-all duration-200 ${
-                      outfitGender === Gender.FEMALE 
-                        ? 'bg-indigo-600 text-white shadow-[0_4px_12px_rgba(99,102,241,0.25)]' 
+                    onClick={() => setStyleSubTab('makeup')}
+                    className={`flex-1 py-1.5 text-[10px] font-black uppercase tracking-wider rounded-lg transition-all duration-200 ${
+                      styleSubTab === 'makeup'
+                        ? 'bg-white/10 text-white shadow-sm'
                         : 'text-neutral-400 hover:text-neutral-200'
                     }`}
                   >
-                    Female Outfits
+                    Makeup
                   </button>
                 </div>
 
-                {/* Category Filter Chips */}
-                <div className="flex overflow-x-auto no-scrollbar gap-2 px-1 scroll-smooth">
-                  {[
-                    { id: 'all', label: 'All' },
-                    { id: 'casual', label: 'Casual' },
-                    { id: 'business', label: 'Business' },
-                    { id: 'luxury', label: 'Luxury' },
-                    { id: 'active', label: 'Activewear' },
-                    { id: 'vacation', label: 'Vacation' }
-                  ].map((cat) => (
-                    <button
-                      key={cat.id}
-                      type="button"
-                      onClick={() => setOutfitCategory(cat.id)}
-                      className={`px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest border transition-all duration-200 flex-shrink-0 active:scale-95 ${
-                        outfitCategory === cat.id
-                          ? 'bg-indigo-600 text-white border-indigo-500 shadow-md shadow-indigo-600/10'
-                          : 'bg-white/5 text-neutral-400 border-white/10 hover:text-white'
-                      }`}
-                    >
-                      {cat.label}
-                    </button>
-                  ))}
-                </div>
+                {styleSubTab === 'outfits' && (
+                  <>
+                    {/* Gender Switcher Tab bar */}
+                    <div className="flex bg-white/5 p-1 rounded-2xl border border-white/5 mb-4">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setOutfitGender(Gender.MALE);
+                          setOutfitCategory('all');
+                        }}
+                        className={`flex-1 py-2 text-center text-xs font-black uppercase tracking-widest rounded-xl transition-all duration-200 ${
+                          outfitGender === Gender.MALE 
+                            ? 'bg-indigo-600 text-white shadow-[0_4px_12px_rgba(99,102,241,0.25)]' 
+                            : 'text-neutral-400 hover:text-neutral-200'
+                        }`}
+                      >
+                        Male Outfits
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setOutfitGender(Gender.FEMALE);
+                          setOutfitCategory('all');
+                        }}
+                        className={`flex-1 py-2 text-center text-xs font-black uppercase tracking-widest rounded-xl transition-all duration-200 ${
+                          outfitGender === Gender.FEMALE 
+                            ? 'bg-indigo-600 text-white shadow-[0_4px_12px_rgba(99,102,241,0.25)]' 
+                            : 'text-neutral-400 hover:text-neutral-200'
+                        }`}
+                      >
+                        Female Outfits
+                      </button>
+                    </div>
+
+                    {/* Category Filter Chips */}
+                    <div className="flex overflow-x-auto no-scrollbar gap-2 px-1 scroll-smooth">
+                      {[
+                        { id: 'all', label: 'All' },
+                        { id: 'casual', label: 'Casual' },
+                        { id: 'business', label: 'Business' },
+                        { id: 'luxury', label: 'Luxury' },
+                        { id: 'active', label: 'Activewear' },
+                        { id: 'vacation', label: 'Vacation' }
+                      ].map((cat) => (
+                        <button
+                          key={cat.id}
+                          type="button"
+                          onClick={() => setOutfitCategory(cat.id)}
+                          className={`px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest border transition-all duration-200 flex-shrink-0 active:scale-95 ${
+                            outfitCategory === cat.id
+                              ? 'bg-indigo-600 text-white border-indigo-500 shadow-md shadow-indigo-600/10'
+                              : 'bg-white/5 text-neutral-400 border-white/10 hover:text-white'
+                          }`}
+                        >
+                          {cat.label}
+                        </button>
+                      ))}
+                    </div>
+                  </>
+                )}
               </div>
 
-              {/* Group shelves by outfit subcategory */}
-              <div className="px-6 mt-7 space-y-6">
-              {(() => {
-                const shelves = [
-                  { title: 'Casual & Daily Wear', key: 'casual' },
-                  { title: 'Business & Professional', key: 'business' },
-                  { title: 'Upscale Luxury Attire', key: 'luxury' },
-                  { title: 'Activewear & Sport', key: 'active' },
-                  { title: 'Vacation & Travel', key: 'vacation' }
-                ];
+              {styleSubTab === 'outfits' ? (
+                /* Group shelves by outfit subcategory */
+                <div className="px-6 mt-6 space-y-6">
+                  {(() => {
+                    const shelves = [
+                      { title: 'Casual & Daily Wear', key: 'casual' },
+                      { title: 'Business & Professional', key: 'business' },
+                      { title: 'Upscale Luxury Attire', key: 'luxury' },
+                      { title: 'Activewear & Sport', key: 'active' },
+                      { title: 'Vacation & Travel', key: 'vacation' }
+                    ];
 
-                const targetPresets = outfitGender === Gender.MALE ? MALE_OUTFIT_PREVIEWS : FEMALE_OUTFIT_PREVIEWS;
+                    const targetPresets = outfitGender === Gender.MALE ? MALE_OUTFIT_PREVIEWS : FEMALE_OUTFIT_PREVIEWS;
 
-                return shelves.map(shelf => {
-                  // Filter shelves by category tab selection
-                  if (outfitCategory !== 'all' && shelf.key !== outfitCategory) return null;
+                    return shelves.map(shelf => {
+                      if (outfitCategory !== 'all' && shelf.key !== outfitCategory) return null;
 
-                  const list = targetPresets.filter(o => o.subcategory === shelf.key);
-                  if (list.length === 0) return null;
+                      const list = targetPresets.filter(o => o.subcategory === shelf.key);
+                      if (list.length === 0) return null;
 
-                  return (
-                    <div key={shelf.key} className={`mb-6 flex-shrink-0 ${list.length <= 2 ? 'text-center' : 'text-left'}`}>
-                      <div className={`flex mb-3 ${list.length <= 2 ? 'justify-center' : 'justify-between items-center'}`}>
-                        <span className="text-[10px] font-black uppercase tracking-widest text-neutral-400">{shelf.title}</span>
-                      </div>
-                      <div className={`flex gap-4 overflow-x-auto no-scrollbar py-1 ${list.length <= 2 ? 'justify-center' : 'justify-start'}`}>
-                        {list.map(t => (
-                          <OutfitCard
-                            key={t.id + t.image}
-                            t={t}
-                            isSelected={state.selectedOutfit?.id === t.id}
-                            onClick={() => handleSelectTemplateForPreview(t)}
-                            favoritedStyles={favoritedStyles}
-                            onToggleStyleFavorite={handleToggleStyleFavorite}
+                      return (
+                        <div key={shelf.key} className={`mb-6 flex-shrink-0 ${list.length <= 2 ? 'text-center' : 'text-left'}`}>
+                          <div className={`flex mb-3 ${list.length <= 2 ? 'justify-center' : 'justify-between items-center'}`}>
+                            <span className="text-[10px] font-black uppercase tracking-widest text-neutral-400">{shelf.title}</span>
+                          </div>
+                          <div className={`flex gap-4 overflow-x-auto no-scrollbar py-1 ${list.length <= 2 ? 'justify-center' : 'justify-start'}`}>
+                            {list.map(t => (
+                              <OutfitCard
+                                key={t.id + t.image}
+                                t={t}
+                                isSelected={state.selectedOutfit?.id === t.id}
+                                onClick={() => handleSelectTemplateForPreview(t)}
+                                favoritedStyles={favoritedStyles}
+                                onToggleStyleFavorite={handleToggleStyleFavorite}
+                              />
+                            ))}
+                          </div>
+                        </div>
+                      );
+                    });
+                  })()}
+                </div>
+              ) : (
+                /* Makeup Grid Presets */
+                <div className="px-6 mt-6">
+                  <div className="grid grid-cols-2 gap-4">
+                    {FEMALE_MAKEUP_PREVIEWS.map(t => (
+                      <button
+                        key={t.id + t.image}
+                        type="button"
+                        onClick={() => handleSelectTemplateForPreview(t)}
+                        className="group relative flex flex-col items-center bg-neutral-900/40 hover:bg-neutral-900/70 border border-white/5 hover:border-white/10 rounded-2xl overflow-hidden p-2 transition-all text-left"
+                      >
+                        <div className="relative w-full aspect-[4/5] rounded-xl overflow-hidden bg-neutral-950 mb-2">
+                          <img 
+                            src={t.image} 
+                            alt={t.label} 
+                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                           />
-                        ))}
-                      </div>
-                    </div>
-                  );
-                });
-              })()}
+                          {/* Favorites Style Heart Button */}
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleToggleStyleFavorite({
+                                id: t.id,
+                                category: 'makeup',
+                                label: t.label,
+                                image: t.image,
+                                gender: 'Female'
+                              });
+                            }}
+                            className="absolute top-2 right-2 w-7 h-7 rounded-full bg-black/60 border border-white/10 flex items-center justify-center text-white active:scale-90 hover:bg-black/85 transition-all z-10"
+                          >
+                            <svg
+                              className={`w-3.5 h-3.5 ${favoritedStyles.some(f => f.id === t.id) ? 'fill-red-500 stroke-red-500' : 'stroke-white fill-none'}`}
+                              viewBox="0 0 24 24"
+                              strokeWidth="2.5"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                            >
+                              <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
+                            </svg>
+                          </button>
+                        </div>
+                        <div className="w-full px-1">
+                          <span className="text-[11px] font-extrabold text-white group-hover:text-indigo-400 transition-colors leading-none">{t.label}</span>
+                          <p className="text-[9px] text-neutral-500 font-semibold truncate leading-relaxed mt-0.5">{t.description}</p>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           </div>
-        </div>
-      )}
+        )}
 
         {state.currentMode === AppMode.AESTHETICS && (
           <AestheticsView 
@@ -1216,12 +1395,13 @@ const App: React.FC = () => {
 
 
 
+
             {/* Tab switch header */}
-            <div className="flex bg-white/5 p-1 rounded-2xl border border-white/5 mb-6">
+            <div className="flex bg-white/5 p-1 rounded-2xl border border-white/5 mb-6 gap-1">
               <button
                 type="button"
                 onClick={() => setMeTab('creations')}
-                className={`flex-1 py-2 text-center text-[10px] font-black uppercase tracking-wider rounded-xl transition-all duration-200 ${
+                className={`flex-1 py-2 px-1 text-center text-[8.5px] xs:text-[9.5px] font-black uppercase tracking-wide rounded-xl transition-all duration-200 truncate ${
                   meTab === 'creations' 
                     ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/10' 
                     : 'text-neutral-400 hover:text-neutral-200'
@@ -1232,7 +1412,7 @@ const App: React.FC = () => {
               <button
                 type="button"
                 onClick={() => setMeTab('styles')}
-                className={`flex-1 py-2 text-center text-[10px] font-black uppercase tracking-wider rounded-xl transition-all duration-200 ${
+                className={`flex-1 py-2 px-1 text-center text-[8.5px] xs:text-[9.5px] font-black uppercase tracking-wide rounded-xl transition-all duration-200 truncate ${
                   meTab === 'styles' 
                     ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/10' 
                     : 'text-neutral-400 hover:text-neutral-200'
@@ -1240,26 +1420,39 @@ const App: React.FC = () => {
               >
                 Saved Styles
               </button>
+              <button
+                type="button"
+                onClick={() => setMeTab('180')}
+                className={`flex-1 py-2 px-1 text-center text-[8.5px] xs:text-[9.5px] font-black uppercase tracking-wide rounded-xl transition-all duration-200 truncate ${
+                  meTab === '180' 
+                    ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/10' 
+                    : 'text-neutral-400 hover:text-neutral-200'
+                }`}
+              >
+                Saved 180°
+              </button>
             </div>
 
             {/* Favorites Content */}
-            {meTab === 'creations' ? (
-              <div className="flex-1 flex flex-col min-h-[300px] text-left">
+            {meTab === 'creations' && (
+              <div className="flex-1 flex flex-col min-h-[300px] text-left animate-in fade-in duration-200">
                 <div className="flex justify-between items-center mb-4 pb-2 border-b border-white/5">
                   <span className="text-[9px] font-black uppercase tracking-widest text-neutral-400">My Saved Creations</span>
                 </div>
                 <div className="flex-1 relative">
                   <FavoritesView 
                     onLoadGeneration={handleLoadGeneration} 
-                    favorites={favoritedCreations}
+                    favorites={favoritedCreations.filter(c => c.type !== '180-preview')}
                     loading={loadingCreations}
                     onRemoveFavorite={(id) => handleToggleLookFavorite({ id } as any, false)}
                     onDelete={handleDeleteLook}
                   />
                 </div>
               </div>
-            ) : (
-              <div className="flex-1 flex flex-col min-h-[300px] text-left">
+            )}
+
+            {meTab === 'styles' && (
+              <div className="flex-1 flex flex-col min-h-[300px] text-left animate-in fade-in duration-200">
                 <div className="flex justify-between items-center mb-4 pb-2 border-b border-white/5">
                   <span className="text-[9px] font-black uppercase tracking-widest text-neutral-400">My Saved Styles</span>
                 </div>
@@ -1314,6 +1507,78 @@ const App: React.FC = () => {
                     </div>
                   )}
                 </div>
+              </div>
+            )}
+
+            {meTab === '180' && (
+              <div className="flex-1 flex flex-col min-h-[300px] text-left animate-in fade-in duration-200">
+                <div className="flex justify-between items-center mb-4 pb-2 border-b border-white/5">
+                  <span className="text-[9px] font-black uppercase tracking-widest text-neutral-400">My Saved 180° Previews</span>
+                </div>
+                <div className="flex-1 relative">
+                  {favoritedCreations.filter(c => c.type === '180-preview').length === 0 ? (
+                    <div className="flex flex-col items-center justify-center py-16 text-center text-neutral-500 bg-neutral-900/10 border border-white/5 rounded-2xl">
+                      <div className="w-10 h-10 rounded-full bg-neutral-900 border border-white/5 flex items-center justify-center text-neutral-600 mb-3">
+                        <svg className="w-5 h-5 text-neutral-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                        </svg>
+                      </div>
+                      <p className="text-xs font-bold text-white">No Saved 180° Previews Yet</p>
+                      <p className="text-[10px] text-neutral-500 mt-1 max-w-[200px] leading-relaxed">Generate a 180° preview and tap the heart to save it here.</p>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-2 gap-4 pb-24">
+                      {favoritedCreations.filter(c => c.type === '180-preview').map(item => {
+                        return (
+                          <div 
+                            key={item.id}
+                            onClick={() => updateState({ showAI180Viewer: true, activeAI180Favorite: item })}
+                            className="group relative flex flex-col bg-neutral-900/50 border border-white/5 hover:border-indigo-500/30 rounded-2xl overflow-hidden p-2 transition-all cursor-pointer active:scale-[0.99] animate-in zoom-in duration-200"
+                          >
+                            {/* Photo Area */}
+                            <div className="relative w-full aspect-[4/5] rounded-xl overflow-hidden bg-neutral-950 mb-2">
+                              <img 
+                                src={item.frontImage || item.generatedImageUrl} 
+                                alt="180 Preview" 
+                                className="w-full h-full object-cover"
+                              />
+                              
+                              {/* 180 Badge */}
+                              <div className="absolute top-2 left-2 px-2 py-0.5 rounded-md bg-indigo-600/90 backdrop-blur-md text-[8px] font-black uppercase text-white tracking-wider border border-indigo-400/30 shadow-md flex items-center gap-1">
+                                <span>180°</span>
+                              </div>
+
+                              {/* Unfavorite button */}
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleToggleLookFavorite(item, false);
+                                }}
+                                className="absolute top-2 right-2 w-7 h-7 rounded-full bg-black/60 border border-white/10 flex items-center justify-center text-red-500 active:scale-90 transition-all z-10 hover:bg-red-500/20"
+                              >
+                                <svg className="w-3.5 h-3.5 fill-red-500 stroke-red-500" viewBox="0 0 24 24" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                  <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
+                                </svg>
+                              </button>
+                            </div>
+
+                            {/* Info */}
+                            <div className="px-1 text-left">
+                              <div className="flex justify-between items-center mb-0.5">
+                                <span className="text-[9px] font-bold text-neutral-400 uppercase tracking-wider">{item.gender}</span>
+                                <span className="text-[8px] text-indigo-400 font-extrabold uppercase tracking-widest">Interactive →</span>
+                              </div>
+                              <div className="text-[11px] font-semibold text-white/90 truncate">
+                                {formatStyleName(item.hairStyle)} ({formatStyleName(item.hairColor)})
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}                </div>
               </div>
             )}
           </div>
@@ -1372,7 +1637,7 @@ const App: React.FC = () => {
       )}
 
       {/* --- Bottom Navigation --- */}
-      {!showAI180Capture && !state.showAI180Viewer && state.editorMode !== "interactive_180" && !state.show360Viewer && (
+      {!showAI180Capture && !state.showAI180Viewer && (
         <BottomNav 
           currentMode={state.currentMode} 
           onSwitchMode={(mode) => updateState({ currentMode: mode })} 
@@ -1643,9 +1908,9 @@ const App: React.FC = () => {
 
 
       {/* --- Onboarding Paywall Overlay --- */}
-      {showOnboardingPaywall && currentUser && (
+      {showOnboardingPaywall && (
         <PaywallView 
-          uid={currentUser.uid}
+          uid={currentUser?.uid || "guest_user_local"}
           appState={state}
           onUpdateState={updateState}
           onContinueFree={() => setShowOnboardingPaywall(false)}
@@ -1653,39 +1918,29 @@ const App: React.FC = () => {
         />
       )}
 
-      {/* --- Premium 180° Preview Overlay --- */}
-      {state.show360Viewer && currentUser && (
-        <ThreeSixtyViewer
-          uid={currentUser.uid}
-          appState={state}
-          onUpdateState={updateState}
-          onClose={() => updateState({ show360Viewer: false, active360PreviewId: null })}
-          onOpenPaywall={() => {
-            updateState({ show360Viewer: false, active360PreviewId: null });
-            setShowOnboardingPaywall(true);
-          }}
-        />
-      )}
-
-      {/* --- Experimental AI 180° Viewer Overlay --- */}
-      {state.showAI180Viewer && currentUser && (
+      {state.showAI180Viewer && (
         <AI180Viewer
-          uid={currentUser.uid}
-          appState={state}
-          onUpdateState={updateState}
-          onClose={() => updateState({ showAI180Viewer: false })}
-          onOpenOriginal180={() => updateState({ show360Viewer: true })}
+          uid={currentUser?.uid || "guest_user_local"}
+          appState={{ ...state, favoritedCreations, favoritedStyles }}
+          onUpdateState={(updates) => {
+            if (updates.favoritedCreations !== undefined) {
+              setFavoritedCreations(updates.favoritedCreations);
+            }
+            if (updates.favoritedStyles !== undefined) {
+              setFavoritedStyles(updates.favoritedStyles);
+            }
+            updateState(updates);
+          }}
+          onClose={() => updateState({ showAI180Viewer: false, activeAI180Favorite: null })}
         />
       )}
 
-      {showAI180Capture && currentUser && (
+      {showAI180Capture && (
         <AI180Capture
           onCaptureComplete={handleCaptureAI180Complete}
           onClose={() => setShowAI180Capture(false)}
         />
       )}
-
-
       {/* --- Rewarded Video Ad Modal --- */}
       {showAdModal && (
         <AdRewardModal 

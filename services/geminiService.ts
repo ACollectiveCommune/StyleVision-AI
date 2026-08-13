@@ -483,36 +483,79 @@ const applyDifferenceMask = async (originalSrc: string, generatedSrc: string, cu
 
           let maskValue = 255; // Default: fully generated
 
-          if (isReplacementActive) {
-            if (y < collarY - feather) {
-              // Entire head, hair, face, beard, and upper neck come 100% from the generated image
-              // This guarantees ZERO ghosting and 100% sharpness for all facial features
-              maskValue = 255;
-            } else if (y >= collarY - feather && y <= collarY) {
-              // Smoothly transition from head (generated) to clothing/shoulders
-              const factor = (y - (collarY - feather)) / feather; // 0.0 at top of feather, 1.0 at collarY
-              
-              // Calculate difference mask for clothing/shoulders at this pixel
-              const rDiff = Math.abs(genPixels.data[i] - origPixels.data[i]);
-              const gDiff = Math.abs(genPixels.data[i+1] - origPixels.data[i+1]);
-              const bDiff = Math.abs(genPixels.data[i+2] - origPixels.data[i+2]);
-              const diff = (rDiff + gDiff + bDiff) / 3.0;
+          // Background preservation zone check:
+          // If we are outside the horizontal face/body zone, force maskValue to 0 (preserves original background)
+          let shouldForceBg = false;
+          if (hasFace) {
+            const faceWidth = maxSkinX - minSkinX;
+            const faceCenterX = (minSkinX + maxSkinX) / 2;
+            const distFromCenter = Math.abs(x - faceCenterX);
+            
+            // 1. Far left/right sides are background only
+            if (distFromCenter > faceWidth * 1.3) {
+              shouldForceBg = true;
+            }
+            // 2. Corners above the head/shoulders are background only
+            else if (y < minSkinY && distFromCenter > faceWidth * 0.9) {
+              shouldForceBg = true;
+            }
+            // 3. Below the body/shoulders outside the center width
+            else if (y > collarY && distFromCenter > faceWidth * 1.5) {
+              shouldForceBg = true;
+            }
+          }
 
-              const blendRange = 12;
-              let diffValue = 0;
-              if (diff < threshold) {
-                diffValue = 0;
-              } else if (diff > (threshold + blendRange)) {
-                diffValue = 255;
+          if (shouldForceBg) {
+            maskValue = 0;
+          } else {
+            if (isReplacementActive) {
+              if (y < collarY - feather) {
+                // Entire head, hair, face, beard, and upper neck come 100% from the generated image
+                // This guarantees ZERO ghosting and 100% sharpness for all facial features
+                maskValue = 255;
+              } else if (y >= collarY - feather && y <= collarY) {
+                // Smoothly transition from head (generated) to clothing/shoulders
+                const factor = (y - (collarY - feather)) / feather; // 0.0 at top of feather, 1.0 at collarY
+                
+                // Calculate difference mask for clothing/shoulders at this pixel
+                const rDiff = Math.abs(genPixels.data[i] - origPixels.data[i]);
+                const gDiff = Math.abs(genPixels.data[i+1] - origPixels.data[i+1]);
+                const bDiff = Math.abs(genPixels.data[i+2] - origPixels.data[i+2]);
+                const diff = (rDiff + gDiff + bDiff) / 3.0;
+
+                const blendRange = 12;
+                let diffValue = 0;
+                if (diff < threshold) {
+                  diffValue = 0;
+                } else if (diff > (threshold + blendRange)) {
+                  diffValue = 255;
+                } else {
+                  const f = (diff - threshold) / blendRange;
+                  diffValue = Math.round(f * 255);
+                }
+
+                // Blend: at top of feather, it is 100% generated (255). At bottom (collarY), it uses the difference value
+                maskValue = Math.round(255 * (1.0 - factor) + diffValue * factor);
               } else {
-                const f = (diff - threshold) / blendRange;
-                diffValue = Math.round(f * 255);
-              }
+                // Below collar line (shoulders, clothing, background), use the difference mask
+                const rDiff = Math.abs(genPixels.data[i] - origPixels.data[i]);
+                const gDiff = Math.abs(genPixels.data[i+1] - origPixels.data[i+1]);
+                const bDiff = Math.abs(genPixels.data[i+2] - origPixels.data[i+2]);
+                const diff = (rDiff + gDiff + bDiff) / 3.0;
 
-              // Blend: at top of feather, it is 100% generated (255). At bottom (collarY), it uses the difference value
-              maskValue = Math.round(255 * (1.0 - factor) + diffValue * factor);
+                const blendRange = 12;
+                if (diff < threshold) {
+                  maskValue = 0;
+                } else if (diff > (threshold + blendRange)) {
+                  maskValue = 255;
+                } else {
+                  const factor = (diff - threshold) / blendRange;
+                  maskValue = Math.round(factor * 255);
+                }
+              }
             } else {
-              // Below collar line (shoulders, clothing, background), use the difference mask
+              // For outfits, makeup, or aesthetic treatments where face/hair preservation is inactive,
+              // we use the difference mask thresholding everywhere
               const rDiff = Math.abs(genPixels.data[i] - origPixels.data[i]);
               const gDiff = Math.abs(genPixels.data[i+1] - origPixels.data[i+1]);
               const bDiff = Math.abs(genPixels.data[i+2] - origPixels.data[i+2]);
@@ -527,23 +570,6 @@ const applyDifferenceMask = async (originalSrc: string, generatedSrc: string, cu
                 const factor = (diff - threshold) / blendRange;
                 maskValue = Math.round(factor * 255);
               }
-            }
-          } else {
-            // For outfits, makeup, or aesthetic treatments where face/hair preservation is inactive,
-            // we use the difference mask thresholding everywhere
-            const rDiff = Math.abs(genPixels.data[i] - origPixels.data[i]);
-            const gDiff = Math.abs(genPixels.data[i+1] - origPixels.data[i+1]);
-            const bDiff = Math.abs(genPixels.data[i+2] - origPixels.data[i+2]);
-            const diff = (rDiff + gDiff + bDiff) / 3.0;
-
-            const blendRange = 12;
-            if (diff < threshold) {
-              maskValue = 0;
-            } else if (diff > (threshold + blendRange)) {
-              maskValue = 255;
-            } else {
-              const factor = (diff - threshold) / blendRange;
-              maskValue = Math.round(factor * 255);
             }
           }
 
@@ -997,7 +1023,6 @@ const COLOR_PROMPTS: Record<string, string> = {
   pink_ombre: "dark roots fading smoothly into soft pastel pink tips (ombre style)",
   grey_highlights: "natural salt and pepper style with silver grey highlights woven through the dark base",
 };
-
 export const generateStylePreview = async (
   currentState: AppState,
   styleSnapshotOverride?: {
@@ -1010,9 +1035,11 @@ export const generateStylePreview = async (
     outfitId: string;
     eyeColorId?: string;
   },
-  seedOverride?: number
-): Promise<string> => {
-  if (!currentState.originalImage) {
+  seedOverride?: number,
+  referenceImages?: string[],
+  targetViewLabel?: string,
+  extraSharpnessPrompt?: boolean
+): Promise<string> => {  if (!currentState.originalImage) {
     throw new Error("No image to edit");
   }
 
@@ -1331,20 +1358,50 @@ Preserve the person's identity, facial structure, lips, skin tone, expression, s
     CRITICAL QUALITY CONTROL RULES:
     1. Only modify the hair and facial hair regions (unless outfit, makeup, or aesthetic treatments are specified). 
     2. Do NOT change the shape, color, or style of anything else.
-    3. NO HEAD SHIFTING: The head position, size, rotation, and angle must remain in the exact same pixel coordinates as the input photo. Do NOT shift, rotate, scale, or move the head. The eyes, nose, mouth, and chin must align perfectly.
+    3. NO HEAD SHIFTING & NO RESIZING: The head position, scale, size, rotation, and angle must remain in the exact same pixel coordinates as the input photo. Do NOT shift, rotate, scale, zoom, stretch, or resize the head. The size of the face, jawline, ears, skull, nose, eyes, and mouth must be a perfect 1:1 pixel-for-pixel match to the input photo.
     4. SKIN COMPLEXION PRESERVATION: Preserve the person's original natural skin tone and complexion exactly. Maintain consistent skin color across the forehead, cheeks, nose, lips, jaw, ears, neck, and all visible skin. Do not introduce pink, purple, green, gray, yellow, blue, or orange patches. Do not change ethnicity, complexion, undertone, tanning, or pigmentation. Do not apply global skin smoothing, whitening, darkening, recoloring, or airbrushing. Keep all natural skin texture, visible pores, freckles, and details exactly as in the original image.
     5. Keep the eyebrows 100% identical to the original image in shape, thickness, position, and color (unless specific cosmetic treatments/makeup are applied).
     6. PHOTOREALISTIC BEARD: Make sure the generated beard/mustache hair looks extremely natural and realistic with visible, fine, individual hair strands that naturally feather into the skin.
     7. STYLE CONSISTENCY: Keep all specified style selections (hairstyle, beard style, hair color, outfit, makeup) completely consistent and exactly as requested in this prompt. Do not drift, randomize, or revert these styles even while adjusting or applying other treatments (like skin glow, fillers, or botox).
+    8. ELIMINATE BLURRY EDGES & CORNERS: The entire generated image must be sharp, crisp, and high-definition from edge to edge. Pay special attention to the left, right, top, and bottom borders, margins, and corners of the photo. Avoid any blurriness, stretching, smearing, out-of-focus artifacts, or pixelation on the sides of the subject, background, or edges. The background details and subject outlines on the sides of the frame must be perfectly clean and sharp.
   `);
 
   if (seedOverride !== undefined) {
     promptParts.push(`
-      STRICT CROSS-ANGLE IDENTITY & STYLE COHERENCE:
       The subject in this photo is being generated as part of a 180° interactive preview. 
       You MUST keep the subject's face shape, jawline structure, skin tone, skin texture, age, hairline, fade height, hair texture, beard density, beard lines, outfit cut, outfit colors, outfit fabric, makeup intensity, and lighting 100% consistent with other generated angles. 
       Avoid any random style drift or identity shifts. Perform the try-on precisely on the source angle.
+      HAIR AND BEARD LENGTH UNIFORMITY: The length, volume, and thickness of both the hair (including top, sides, back, and fade heights) and the beard (including sideburns, mustache, and chin hair) must be EXACTLY identical and consistent in length across all angles. Do not allow the hair or beard to grow longer, get trimmed shorter, or shift in thickness. The physical length of the hair/beard strands must be uniform and constant across the entire 180° preview.
     `);
+  }
+
+  if (extraSharpnessPrompt) {
+    promptParts.push(`
+      CRITICAL HIGH-DEFINITION & RESOLUTION REQUIREMENT:
+      - The output image MUST be extremely sharp, clean, high-definition, and clear of any blurriness, soft focus, out-of-focus areas, or pixelation.
+      - Ensure all details of the face, hair strands, beard, clothing texture, and background are rendered with crisp, sharp, well-defined edges.
+      - Do NOT introduce any blur, noise, smoothing, or compression artifacts.
+    `);
+  }
+
+  if (referenceImages && referenceImages.length > 0) {
+    promptParts.push("You are given multiple images in this request:");
+    promptParts.push("1. The first image is the input source image for the current head angle. You must edit this image.");
+    promptParts.push("2. The second image is the generated Front View Master image. This image represents the canonical, final approved style that has already been generated.");
+    if (referenceImages.length > 1) {
+      promptParts.push("3. The third image is the already-generated neighboring view to assist with smooth angle transition.");
+    }
+    
+    promptParts.push(`
+STRICT CONSISTENCY RULES:
+- The generated Reference Image defines the exact final style appearance. You MUST preserve this exact style. Do NOT redesign or re-interpret it.
+- Keep the exact same outfit details: clothing type, clothing colors, collar design, lapels, shirt color, tie/bow-tie design, fabric texture, pocket squares, and accessories.
+- Keep the exact same hairstyle and hair color: fade height, taper, top length, physical hair length on all parts of the head, texture, volume, hairline, shape, and dye tone. The hair length must be perfectly consistent and identical in 3D space with the reference image(s).
+- Keep the exact same beard style and beard color: beard hair length, beard thickness, outlines, density, shape, cheek/neck lines, mustache style, and dye tone. The beard and mustache length must be perfectly uniform and identical in 3D space with the reference image(s).
+- Keep the exact same makeup details: colors, placement, intensity, lipstick shade, eyeliner style, and blush/contour.
+- Keep the exact same facial aesthetics modifications: lip fullness, cheek proportions, forehead structure, and geometry.
+- Represent the same person in the exact same state, only viewed from another angle.
+`);
   }
 
   const prompt = promptParts.join("\n");
@@ -1373,19 +1430,37 @@ Preserve the person's identity, facial structure, lips, skin tone, expression, s
     }
     const url = `${baseUrl}/v1beta/models/gemini-3.1-flash-image:generateContent?key=${apiKey}`;
 
+    const parts: any[] = [
+      {
+        inlineData: {
+          mimeType: mimeType, 
+          data: data,
+        },
+      }
+    ];
+
+    if (referenceImages && referenceImages.length > 0) {
+      for (const refImg of referenceImages) {
+        if (refImg) {
+          const compRef = await compressImageBase64(refImg, 768, 0.85);
+          const parsedRef = parseDataUrl(compRef);
+          parts.push({
+            inlineData: {
+              mimeType: parsedRef.mimeType,
+              data: parsedRef.data
+            }
+          });
+        }
+      }
+    }
+
+    parts.push({
+      text: prompt,
+    });
+
     const payload: any = {
       contents: {
-        parts: [
-          {
-            inlineData: {
-              mimeType: mimeType, 
-              data: data,
-            },
-          },
-          {
-            text: prompt,
-          },
-        ],
+        parts: parts,
       },
       safetySettings: [
         {
@@ -1417,11 +1492,11 @@ Preserve the person's identity, facial structure, lips, skin tone, expression, s
             - NATURAL FACIAL HAIR TEXTURE: The generated beard and mustache must look like real, high-resolution facial hair. It must feature distinct, fine hair strands, natural shading, and soft feathering where the hair meets the skin. Do NOT generate solid-painted blocks of color, blur, or drawn-on cartoon lines.
             
             IDENTITY, FACE, & SPATIAL ALIGNMENT RULES:
-            - NO HEAD SHIFTING: The head position, size, rotation, and angle must remain in the exact same pixel coordinates as the input photo. Do NOT shift, rotate, scale, or move the head. The eyes, eyebrows, nose, mouth, and chin must align perfectly.
+            - NO HEAD SHIFTING & NO RESIZING: The head position, scale, height, width, rotation, and angle must remain in the exact same pixel coordinates as the input photo. Do NOT shift, rotate, scale, zoom, stretch, or resize the head. The size of the face, jawline, ears, skull, nose, eyes, and mouth must be a perfect 1:1 pixel-for-pixel match to the input photo.
             - STRICT SKIN TEXTURE PRESERVATION: Do NOT smooth, blur, soften, filter, or airbrush the skin (except where makeup or skin aesthetic treatments are applied). The skin texture must remain completely natural, matching the original pores, lines, grain, skin tone, and details exactly as they are in the original image. Avoid any 'beautified', 'plastic', or 'airbrushed' look, but do NOT introduce, add, or enhance any blemishes, blackheads, freckles, acne, spots, or impurities. The skin must look clean, healthy, and clear of newly generated concerns.
             - STRICT EYEBROW PRESERVATION: Do NOT modify the eyebrows. The shape, thickness, arches, density, color, and placement of the eyebrows must remain exactly identical to the input image.
-            - The background, clothing, camera angle, lighting, and ambient shadows must not change at all.
-            - Only modify pixels representing the hair-on-head region and the facial hair region.`
+            - STRICT BACKGROUND PRESERVATION: The background must remain 100% identical to the input image. Do NOT add, remove, replace, redesign, or invent any furniture, lights, windows, salon equipment, objects, or wall details.
+            - Only modify pixels representing the hair-on-head region, facial hair region, clothing region, and cosmetic region of the person.`
           }
         ]
       }
@@ -1450,13 +1525,43 @@ Preserve the person's identity, facial structure, lips, skin tone, expression, s
       timestamp: new Date().toISOString()
     });
 
-    const response = await fetch(url, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(payload),
-    });
+    let response: Response | null = null;
+    let attempts = 0;
+    const maxAttempts = 3;
+    let delay = 1500;
+
+    while (attempts < maxAttempts) {
+      try {
+        const fetchRes = await fetch(url, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(payload),
+        });
+
+        response = fetchRes;
+
+        // If success or a non-transient error status code (like 400), don't retry
+        if (fetchRes.ok || (fetchRes.status !== 503 && fetchRes.status !== 504 && fetchRes.status !== 502 && fetchRes.status !== 429)) {
+          break;
+        }
+
+        console.warn(`[GEMINI_API_RETRY] [ID: ${requestId}] Attempt ${attempts + 1} failed with status ${fetchRes.status}. Retrying in ${delay}ms...`);
+      } catch (fetchErr: any) {
+        console.warn(`[GEMINI_API_RETRY] [ID: ${requestId}] Attempt ${attempts + 1} threw error: ${fetchErr.message || fetchErr}. Retrying in ${delay}ms...`);
+      }
+
+      attempts++;
+      if (attempts < maxAttempts) {
+        await new Promise(resolve => setTimeout(resolve, delay));
+        delay *= 2; // exponential backoff
+      }
+    }
+
+    if (!response) {
+      throw new Error("Failed to contact Gemini API after multiple retry attempts");
+    }
 
     const duration = Date.now() - startTime;
     console.log(`[GEMINI_API_RESPONSE] [ID: ${requestId}] [Duration: ${duration}ms] [Status: ${response.status}]`);
@@ -1497,5 +1602,253 @@ Preserve the person's identity, facial structure, lips, skin tone, expression, s
     }
     console.error("Gemini API Error details:", error?.message || error, error?.stack);
     throw new GenerationError("provider-rejected", error?.message || String(error));
+  }
+};
+
+export const validateStyleConsistency = async (
+  frontMasterUrl: string,
+  generatedAngleUrl: string,
+  snapshot: any
+): Promise<{ consistent: boolean; reason?: string }> => {
+  try {
+    const isNative = Capacitor.isNativePlatform() || !!(window as any).Capacitor;
+    let baseUrl = "https://generativelanguage.googleapis.com";
+    if (!isNative && typeof window !== "undefined" && window.location.hostname === "localhost") {
+      baseUrl = window.location.origin + "/api-gemini";
+    }
+
+    const apiKey = 
+      import.meta.env.VITE_GEMINI_API_KEY ||
+      import.meta.env.VITE_API_KEY ||
+      import.meta.env.GEMINI_API_KEY ||
+      (typeof process !== "undefined" && process.env ? (process.env.VITE_GEMINI_API_KEY || process.env.GEMINI_API_KEY || process.env.API_KEY) : "") ||
+      "AQ.Ab8RN6Kuy24bsVnPE4FhWqxW_4mT0kbMlQa8jTy1vHNiwZNMUg";
+
+    if (!apiKey) {
+      return { consistent: true };
+    }
+
+    const url = `${baseUrl}/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
+
+    const masterComp = await compressImageBase64(frontMasterUrl, 512, 0.8);
+    const angleComp = await compressImageBase64(generatedAngleUrl, 512, 0.8);
+
+    const masterParsed = parseDataUrl(masterComp);
+    const angleParsed = parseDataUrl(angleComp);
+
+    const prompt = `You are a visual quality assurance auditor verifying style consistency between two images:
+Image 1: The Front View Master styling reference (the ground truth style).
+Image 2: The generated side-angle styled image.
+
+Check the styling parameters for consistency:
+- Outfit: Is the clothing category, jacket color, shirt color, tie color, lapel style, and fabric texture identical?
+- Hair: Is the haircut category, fade line, volume, color, and physical length on top and sides identical?
+- Beard: Is the facial hair category, outlines, color, and length/thickness of sideburns, mustache, and chin hair identical?
+- Hair & Beard Length: Are the hair length (top length, taper, fade line) and beard/mustache hair length exactly consistent and identical in 3D space between both views? If the hair or beard looks visibly longer, shorter, thicker, or thinner in one of the views, mark it as inconsistent.
+- Makeup & Aesthetics: Are the lipstick shade, makeup palette, and structural facial shapes consistent?
+
+Answer ONLY with a JSON object containing two fields:
+{
+  "consistent": true or false,
+  "reason": "Explain briefly what is inconsistent or mismatching, or 'OK' if consistent."
+}
+
+Do not include markdown formatting or backticks around the JSON.`;
+
+    const payload = {
+      contents: {
+        parts: [
+          {
+            inlineData: {
+              mimeType: masterParsed.mimeType,
+              data: masterParsed.data
+            }
+          },
+          {
+            inlineData: {
+              mimeType: angleParsed.mimeType,
+              data: angleParsed.data
+            }
+          },
+          {
+            text: prompt
+          }
+        ]
+      },
+      generationConfig: {
+        responseMimeType: "application/json",
+        temperature: 0.1
+      }
+    };
+
+    const response = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify(payload)
+    });
+
+    if (!response.ok) {
+      console.warn("[VALIDATE_CONSISTENCY] API failed with status", response.status);
+      return { consistent: true };
+    }
+
+    const resData = await response.json();
+    const textResult = resData.candidates?.[0]?.content?.parts?.[0]?.text;
+    if (!textResult) {
+      return { consistent: true };
+    }
+
+    const result = JSON.parse(textResult.trim());
+    console.log("[VALIDATE_CONSISTENCY] Result:", result);
+    return {
+      consistent: !!result.consistent,
+      reason: result.reason || ""
+    };
+  } catch (err) {
+    console.error("[VALIDATE_CONSISTENCY] Crash during verification:", err);
+    return { consistent: true };
+  }
+};
+
+export interface AI180FrameMetadata {
+  index: number;
+  yaw: number;
+  side: "left" | "right" | "front";
+  viewLabel: "left-profile" | "left-3q" | "front-left" | "front" | "front-right" | "right-3q" | "right-profile";
+}
+
+export const analyzeScanAngles = async (
+  frames: string[]
+): Promise<AI180FrameMetadata[]> => {
+  try {
+    const isNative = Capacitor.isNativePlatform() || !!(window as any).Capacitor;
+    let baseUrl = "https://generativelanguage.googleapis.com";
+    if (!isNative && typeof window !== "undefined" && window.location.hostname === "localhost") {
+      baseUrl = window.location.origin + "/api-gemini";
+    }
+
+    const apiKey = 
+      import.meta.env.VITE_GEMINI_API_KEY ||
+      import.meta.env.VITE_API_KEY ||
+      import.meta.env.GEMINI_API_KEY ||
+      (typeof process !== "undefined" && process.env ? (process.env.VITE_GEMINI_API_KEY || process.env.GEMINI_API_KEY || process.env.API_KEY) : "") ||
+      "AQ.Ab8RN6Kuy24bsVnPE4FhWqxW_4mT0kbMlQa8jTy1vHNiwZNMUg";
+
+    if (!apiKey) {
+      throw new Error("API Key missing");
+    }
+
+    const url = `${baseUrl}/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
+
+    const parts: any[] = [];
+    
+    // Compress and add each frame to keep request size reasonable
+    for (let i = 0; i < frames.length; i++) {
+      const comp = await compressImageBase64(frames[i], 320, 0.75);
+      const parsed = parseDataUrl(comp);
+      parts.push({
+        inlineData: {
+          mimeType: parsed.mimeType,
+          data: parsed.data
+        }
+      });
+    }
+    const prompt = `You are a computer vision face orientation analyzer.
+You are given an ordered array of ${frames.length} images extracted from a 180-degree head rotation scan.
+Analyze each image (indexes 0 to ${frames.length - 1} in the order they are provided) to determine the horizontal head rotation (yaw angle in degrees).
+
+Anatomical Reference Definitions:
+- yaw = -90° (Left profile): The subject's left cheek and left ear are fully facing the camera. Their nose points to the side.
+- yaw = 0° (Front): The subject is looking straight ahead at the camera. Both ears are equally visible.
+- yaw = +90° (Right profile): The subject's right cheek and right ear are fully facing the camera. Their nose points to the side.
+
+For each of the ${frames.length} images, output:
+- index: the index in the input array (0 to ${frames.length - 1})
+- yaw: the estimated yaw angle in degrees (between -90 and +90)
+- side: "left" (yaw < -15), "right" (yaw > 15), or "front" (-15 <= yaw <= 15)
+- viewLabel: one of "left-profile" (yaw around -90), "left-3q" (yaw around -60), "front-left" (yaw around -30), "front" (yaw around 0), "front-right" (yaw around +30), "right-3q" (yaw around +60), "right-profile" (yaw around +90).
+
+Return ONLY a raw JSON array matching this typescript interface:
+Array<{
+  index: number;
+  yaw: number;
+  side: "left" | "right" | "front";
+  viewLabel: "left-profile" | "left-3q" | "front-left" | "front" | "front-right" | "right-3q" | "right-profile";
+}>
+
+Do not wrap the response in markdown code blocks or backticks. Return only valid raw JSON.`;
+
+    parts.push({
+      text: prompt
+    });
+
+    const payload = {
+      contents: {
+        parts: parts
+      },
+      generationConfig: {
+        responseMimeType: "application/json",
+        temperature: 0.1
+      }
+    };
+
+    const response = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify(payload)
+    });
+
+    if (!response.ok) {
+      throw new Error(`Angle analysis API failed with status ${response.status}`);
+    }
+
+    const resData = await response.json();
+    const textResult = resData.candidates?.[0]?.content?.parts?.[0]?.text;
+    if (!textResult) {
+      throw new Error("No output from model");
+    }
+
+    const parsed: AI180FrameMetadata[] = JSON.parse(textResult.trim());
+    parsed.sort((a, b) => a.index - b.index);
+
+    // Dynamic mirror flip correction: If first frame has higher yaw than last frame, the yaws are inverted.
+    const firstYaw = parsed[0]?.yaw ?? -90;
+    const lastYaw = parsed[parsed.length - 1]?.yaw ?? 90;
+    if (firstYaw > lastYaw) {
+      console.log("[ANALYZE_SCAN_ANGLES] Detected mirror-inverted head orientations. Correcting angles...");
+      parsed.forEach(p => {
+        p.yaw = -p.yaw;
+        p.side = p.yaw < -15 ? "left" : p.yaw > 15 ? "right" : "front";
+        p.viewLabel =
+          p.yaw <= -75 ? "left-profile" :
+          p.yaw <= -45 ? "left-3q" :
+          p.yaw <= -15 ? "front-left" :
+          p.yaw <= 15 ? "front" :
+          p.yaw <= 45 ? "front-right" :
+          p.yaw <= 75 ? "right-3q" : "right-profile";
+      });
+    }
+
+    console.log("[ANALYZE_SCAN_ANGLES] Normalized Result:", parsed);
+    return parsed;
+  } catch (err) {
+    console.error("[ANALYZE_SCAN_ANGLES] Error, falling back to default linear assignment:", err);
+    // Linear fallback matching capture guidelines: index 0 is Left Profile (-90), index 8 is Right Profile (+90)
+    return Array.from({ length: frames.length }, (_, i) => {
+      const yaw = Math.round(-90 + (i * 22.5));
+      const side = yaw < -15 ? "left" : yaw > 15 ? "right" : "front";
+      const viewLabel =
+        yaw <= -75 ? "left-profile" :
+        yaw <= -45 ? "left-3q" :
+        yaw <= -15 ? "front-left" :
+        yaw <= 15 ? "front" :
+        yaw <= 45 ? "front-right" :
+        yaw <= 75 ? "right-3q" : "right-profile";
+      return { index: i, yaw, side, viewLabel } as AI180FrameMetadata;
+    });
   }
 };

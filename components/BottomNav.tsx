@@ -30,8 +30,8 @@ export const BottomNav: React.FC<BottomNavProps> = ({ currentMode, onSwitchMode 
       )
     },
     {
-      mode: AppMode.OUTFIT,
-      label: 'AI Outfit',
+      mode: AppMode.STYLE,
+      label: 'Style',
       icon: (
         <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
           <path d="M20.38 3.46L16 6a2 2 0 0 1-2-2V2H10v2a2 2 0 0 1-2 2L3.62 3.46a1 1 0 0 0-1.34.46l-1 2A1 1 0 0 0 1.8 7.3l2.2 1.1a2 2 0 0 1 1 1.7V21a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V10.1a2 2 0 0 1 1-1.7l2.2-1.1a1 1 0 0 0 .5-1.38l-1-2a1 1 0 0 0-1.32-.46z"/>

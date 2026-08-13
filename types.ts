@@ -6,7 +6,7 @@ export enum Gender {
 export enum AppMode {
   EDITOR = 'Editor',
   SALON = 'Salon',
-  OUTFIT = 'Outfit',
+  STYLE = 'Style',
   AESTHETICS = 'Aesthetics',
   ME = 'Me',
 }
@@ -82,34 +82,68 @@ export interface AppState {
   credits: number;
   subscriptionTier?: 'none' | 'weekly' | 'monthly' | 'yearly';
   selectedTreatments?: SelectedTreatment[];
-  // 360° Preview fields
+  // 180° Preview fields
   isSubscriber?: boolean;
   subscriptionPlan?: "weekly" | "monthly" | "yearly" | null;
   subscriptionCredits?: number;
   purchasedCredits?: number;
-  available360Credits?: number;
-  active360PreviewId?: string | null;
-  is360FeatureEnabled?: boolean;
-  show360Viewer?: boolean;
   showAI180Viewer?: boolean;
   activeAI180ScanId?: string | null;
   captured180Frames?: Record<string, string>;
   currentDocId?: string | null;
-  editorMode?: "single_photo" | "interactive_180" | "ai_180";
-  current180Session?: Interactive180Session | null;
+  editorMode?: "single_photo" | "ai_180";
+  favoritedCreations?: SavedGeneration[];
+  favoritedStyles?: FavoritedStyle[];
+  activeAI180Favorite?: SavedGeneration | null;
+}
+export interface Saved180Frame {
+  imageUrl: string;
+  yaw: number;
+  viewLabel: string;
+  side: string;
+  sortIndex: number;
 }
 
-export interface Interactive180Session {
-  id: string;
-  frames: {
-    left: string;
-    front_left: string;
-    front: string;
-    front_right: string;
-    right: string;
-    allFrames?: string[];
+export interface SavedGeneration {
+  id?: string;
+  originalImageUrl: string;
+  generatedImageUrl: string;
+  hairStyle: string;
+  hairColor: string;
+  beardStyle: string;
+  beardColor: string;
+  outfit?: string;
+  makeup?: string;
+  eyeColor?: string;
+  treatments?: Array<{ treatmentId: string; value: number; label: string }>;
+  customPrompt?: string;
+  gender: string;
+  timestamp?: any;
+  isFavorite: boolean;
+  type?: "single-photo" | "180-preview";
+  sessionId?: string;
+  frontImage?: string;
+  frames?: Array<string | Saved180Frame>;
+  angleMetadata?: any[];
+  appliedParameters?: {
+    hairStyle?: string;
+    hairColor?: string;
+    beardStyle?: string;
+    beardColor?: string;
+    outfit?: string;
+    makeup?: string;
+    eyeColor?: string;
+    treatments?: any[];
+    customPrompt?: string;
   };
-  status: "captured" | "editing" | "generating" | "complete";
+}
+
+export interface FavoritedStyle {
+  id: string;
+  category: string;
+  label: string;
+  image: string;
+  gender?: string;
 }
 
 export interface AI180Scan {
@@ -118,6 +152,7 @@ export interface AI180Scan {
   createdAt: string;
   sourceFrames: string[]; // 9 base64/Storage URLs
   version: string;
+  metadata?: any[];
 }
 
 export interface AI180GeneratedStyle {
@@ -130,87 +165,5 @@ export interface AI180GeneratedStyle {
   beardColorId: string;
   generatedFrames: string[]; // 9 styled preview URLs
   createdAt: string;
-}
-
-export interface User360Wallet {
-  userId: string;
-  subscriptionCredits: number;
-  purchasedCredits: number;
-  subscriptionPlan: "weekly" | "monthly" | "yearly" | null;
-  subscriptionStatus: "active" | "expired" | "cancelled" | "grace_period";
-  currentPeriodStart: string | null;
-  currentPeriodEnd: string | null;
-  updatedAt: string;
-}
-
-export interface CreditTransaction {
-  id: string;
-  userId: string;
-  amount: number;
-  balanceType: "subscription" | "purchased";
-  transactionType:
-    | "subscription_grant"
-    | "top_up_purchase"
-    | "reservation"
-    | "generation_charge"
-    | "refund"
-    | "expiration"
-    | "manual_adjustment";
-  storeTransactionId?: string;
-  generationJobId?: string;
-  createdAt: string;
-}
-
-export interface ThreeSixtyPreview {
-  id: string;
-  userId: string;
-  sourceSessionId: string;
-  hairstyleId: string;
-  beardId: string;
-  outfitId?: string | null;
-  aestheticsState: Record<string, number>;
-  aestheticsStateHash: string;
-  frameUrls: string[];
-  highResFrameUrls?: string[];
-  thumbnailUrl?: string;
-  status: "draft" | "validating" | "processing" | "complete" | "failed";
-  createdAt: string;
-  completedAt?: string;
-}
-
-export interface ThreeSixtyGenerationJob {
-  id: string;
-  userId: string;
-  previewId: string;
-  sourceSessionId: string;
-  stateSnapshot: {
-    hairstyleId: string;
-    beardId: string;
-    outfitId?: string | null;
-    aesthetics: Record<string, number>;
-    hairColorId?: string | null;
-    beardColorId?: string | null;
-    eyeColorId?: string | null;
-    makeup?: string | null;
-  };
-  status: "queued" | "processing" | "retrying" | "complete" | "failed" | "refunded";
-  reservedCreditTransactionId?: string;
-  expectedFrameCount: number;
-  completedFrameCount: number;
-  retryCount: number;
-  createdAt: string;
-  updatedAt: string;
-}
-
-export interface ThreeSixtyFeatureConfig {
-  enabled: boolean;
-  subscriberOnly: boolean;
-  welcomeCredits: number;
-  weeklyAllowance: number;
-  monthlyAllowance: number;
-  yearlyMonthlyAllowance: number;
-  expectedFrameCount: number;
-  maxAutomaticRetries: number;
-  allowTopUpPurchases: boolean;
-  usePrototypeFrames: boolean;
+  metadata?: any[];
 }

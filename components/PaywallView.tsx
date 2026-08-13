@@ -3,7 +3,7 @@ import { AppState } from '../types';
 import { restorePurchases, isIOS, purchaseSubscription, purchasePremium } from '../services/iapService';
 import { getStorefrontCountryCode, shouldShowExternalPurchaseLink, getExternalLinkDisclosure } from '../services/storefrontService';
 import { LegalDocumentsModal } from './LegalDocumentsModal';
-import { grantSubscriptionAllowance } from '../services/threeSixtyService';
+
 
 interface PaywallViewProps {
   uid: string;
@@ -128,12 +128,10 @@ export const PaywallView: React.FC<PaywallViewProps> = ({
       const isVerifiedPremium = await restorePurchases(); // Guideline 10 & 12
       if (isVerifiedPremium) {
         const restoredPlan = appState.subscriptionPlan || "monthly";
-        const wallet = await getUser360Wallet(uid || "guest_user_local");
         onUpdateState({ 
           isPremium: true,
           isSubscriber: true,
-          subscriptionPlan: restoredPlan,
-          available360Credits: wallet.subscriptionCredits + wallet.purchasedCredits
+          subscriptionPlan: restoredPlan
         });
         alert("Your premium subscription has been successfully restored!");
         onContinueFree();
@@ -170,14 +168,11 @@ export const PaywallView: React.FC<PaywallViewProps> = ({
           // If packages are unavailable, offer a simulated bypass for testing/review compatibility
           const useMock = window.confirm("StoreKit product packages are currently unavailable (this happens in local testing before App Store configurations are active).\n\nWould you like to simulate a successful premium purchase for testing?");
           if (useMock) {
-            const txId = "sub_mock_" + Date.now();
-            const wallet = await grantSubscriptionAllowance(uid || "guest_user_local", planId, txId);
             onUpdateState({
               subscriptionTier: planId,
               isPremium: true,
               isSubscriber: true,
-              subscriptionPlan: planId,
-              available360Credits: wallet.subscriptionCredits + wallet.purchasedCredits
+              subscriptionPlan: planId
             });
             alert(`[Sandbox Mock] Subscription activated successfully!`);
             onContinueFree();
@@ -192,15 +187,11 @@ export const PaywallView: React.FC<PaywallViewProps> = ({
         // Verify entitlement after purchase natively (Guideline 12)
         const activeEntitlement = await purchaseSubscription(targetPlan.rawPackage);
         if (activeEntitlement) {
-          const txId = "sub_ios_" + Date.now();
-          const wallet = await grantSubscriptionAllowance(uid || "guest_user_local", planId, txId);
-          
           onUpdateState({
             subscriptionTier: planId,
             isPremium: true,
             isSubscriber: true,
-            subscriptionPlan: planId,
-            available360Credits: wallet.subscriptionCredits + wallet.purchasedCredits
+            subscriptionPlan: planId
           });
           alert(`Subscription activated successfully! Enjoy your ${targetPlan.name} status.`);
           onContinueFree();
@@ -227,16 +218,12 @@ export const PaywallView: React.FC<PaywallViewProps> = ({
         if (planId === 'monthly') creditGrant = 150;
         else if (planId === 'yearly') creditGrant = 2000;
 
-        const txId = "sub_web_" + Date.now();
-        const wallet = await grantSubscriptionAllowance(uid || "guest_user_local", planId, txId);
-
         onUpdateState({
           subscriptionTier: planId,
           isPremium: true,
           isSubscriber: true,
           subscriptionPlan: planId,
-          credits: appState.credits + creditGrant,
-          available360Credits: wallet.subscriptionCredits + wallet.purchasedCredits
+          credits: appState.credits + creditGrant
         });
         
         alert(`Thank you for subscribing! You are now on the ${planId.toUpperCase()} plan (+${creditGrant} credits granted, and you have unlocked exclusive member top-up rates!).`);
